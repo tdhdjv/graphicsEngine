@@ -1,0 +1,5 @@
+./exe
+./asan_suppression.txt
+./perf.data
+./perf.old.data
+./gmon.out
