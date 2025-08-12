@@ -1,0 +1,6 @@
+# Suppress GTK3 leaks
+leak:libdecor-gtk.so
+leak:libfontconfig.so
+leak:draw_title_bar
+leak:_glfwInitEGL
+leak:glfwCreateWindow

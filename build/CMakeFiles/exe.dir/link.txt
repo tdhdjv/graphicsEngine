@@ -1,0 +1,1 @@
+/usr/bin/cc -Wl,--dependency-file=CMakeFiles/exe.dir/link.d CMakeFiles/exe.dir/src/main.c.o CMakeFiles/exe.dir/dependencies/glad/glad.c.o -o exe  -lcglm_headers
