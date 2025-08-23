@@ -26,7 +26,7 @@
     size_t capacity;\
   } key_t##_##value_t##_Table;\
 \
-  key_t##_##value_t##_Pair* key_t##_##_value_t##_##_table_look_up(key_t##_##value_t##_Table* table, key_t key) {\
+  key_t##_##value_t##_Pair* key_t##_##value_t##_table_look_up(key_t##_##value_t##_Table* table, key_t key) {\
     uint64_t hashValue = hashFunc(key);\
     for(size_t index = (hashValue%table->capacity); index < table->capacity; index++) {\
       if(!table->table[index].taken || isEqual(table->table[index].key, key)) return &table->table[index];\
@@ -35,20 +35,20 @@
   }\
 \
   void key_t##_##value_t##_table_set(key_t##_##value_t##_Table* table, key_t key, value_t value) {\
-    key_t##_##value_t##_Pair* pair = key_t##_##_value_t##_##_table_look_up(table, key);\
+    key_t##_##value_t##_Pair* pair = key_t##_##value_t##_table_look_up(table, key);\
     pair->taken = true;\
     pair->key = key;\
     pair->value = value;\
   }\
 \
   value_t key_t##_##value_t##_table_get(key_t##_##value_t##_Table* table, key_t key, value_t default_value) {\
-    key_t##_##value_t##_Pair* pair = key_t##_##_value_t##_##_table_look_up(table, key);\
+    key_t##_##value_t##_Pair* pair = key_t##_##value_t##_table_look_up(table, key);\
     if(pair->taken) return pair->value;\
     return default_value;\
   }\
 \
   bool key_t##_##value_t##_table_contains(key_t##_##value_t##_Table* table, key_t key) {\
-    key_t##_##value_t##_Pair* pair = key_t##_##_value_t##_##_table_look_up(table, key);\
+    key_t##_##value_t##_Pair* pair = key_t##_##value_t##_table_look_up(table, key);\
     return pair->taken;\
   }\
 \

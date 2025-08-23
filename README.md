@@ -5,10 +5,22 @@ Rules for better type naming (the type should tell you what it is being used for
     else use <stdint> type never int, char ... types (expection: char as actually ascii characters)
     
 
+Goal Try to finish 1 per day
+
 - [x] obj model loading
 - [x] textures
 - [x] scene managment
 - [x] window resizing
-- [ ] improve scene managment
-- [ ] make a gltf parser
+- [x] improve scene managment
+- [x] make a gltf parser
+- [x] material handling
+- [x] environment (skybox)
+- [x] ambient lighting (specular)
+- [ ] code refactoring
+- [ ] ambient lighting (diffuse)
+- [ ] post processes
+- [ ] model matrix loading
+- [ ] imgui
+- [ ] multiple light
+- [ ] animations
 - [ ] improve integers type namings

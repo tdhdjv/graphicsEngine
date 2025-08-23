@@ -1,2 +1,0 @@
-CompileFlags:
-  Add: [-Wall, -Werror, -I../../glad/include, -I../../dependencies/cglm/include , -I../../dependencies/stb_image/include]

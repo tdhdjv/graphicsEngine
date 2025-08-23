@@ -8,7 +8,11 @@
 String read_file(Arena* arena, const char *filename) {
   FILE *fileptr;
   fileptr = fopen(filename, "r");
-  assert(fileptr);
+  if(!fileptr) {
+    fprintf(stderr, "%s isn't a valid file path", filename);
+    fflush(stderr);
+    return (String){0};
+  }
 
   fseek(fileptr, 0, SEEK_END);
   size_t n = ftell(fileptr);
@@ -18,7 +22,6 @@ String read_file(Arena* arena, const char *filename) {
 
   assert(fread(str, 1, n, fileptr) == n);
   fclose(fileptr);
-  str[n-1] = '\0';
   String string = {0};
   string.data = str;
   string.len = n;

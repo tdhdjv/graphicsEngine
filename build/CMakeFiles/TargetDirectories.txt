@@ -1,3 +1,0 @@
-/home/tdhdjv/dev/graphics_engine/build/CMakeFiles/exe.dir
-/home/tdhdjv/dev/graphics_engine/build/CMakeFiles/edit_cache.dir
-/home/tdhdjv/dev/graphics_engine/build/CMakeFiles/rebuild_cache.dir
