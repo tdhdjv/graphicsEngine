@@ -147,13 +147,13 @@ ObjModel parse_obj(Arena* arena, const String objSource) {
   lines.tail = objSource;
   while(lines.tail.len) {
     lines = string_cut(lines.tail, '\n');
-    Cut fields = string_cut(string_trim_right(lines.head), ' ');
+    Cut fields = string_cut(string_trim_right(lines.head, " "), ' ');
     String type = fields.head;
 
-    if(string_equals(STRING("v"), type)) model.positionCount++;
-    else if(string_equals(STRING("vt"), type)) model.uvCount++;
-    else if(string_equals(STRING("vn"), type)) model.normalCount++;
-    else if(string_equals(STRING("f"), type)) model.faceCount++;
+    if(string_equals(create_string("v"), type)) model.positionCount++;
+    else if(string_equals(create_string("vt"), type)) model.uvCount++;
+    else if(string_equals(create_string("vn"), type)) model.normalCount++;
+    else if(string_equals(create_string("f"), type)) model.faceCount++;
   }
   model.positions = arena_alloc_array(arena, vec3, model.positionCount);
   model.normals = arena_alloc_array(arena, vec3, model.normalCount);
@@ -166,14 +166,14 @@ ObjModel parse_obj(Arena* arena, const String objSource) {
   lines.tail = objSource;
   while(lines.tail.len) {
     lines = string_cut(lines.tail, '\n');
-    Cut fields = string_cut(string_trim_right(lines.head), ' ');
+    Cut fields = string_cut(string_trim_right(lines.head, " "), ' ');
     String type = fields.head;
     String data = string_trim_left(fields.tail);
     
-    if(string_equals(STRING("v"), type)) string_to_vec3(data, &model.positions[model.positionCount++]);
-    else if(string_equals(STRING("vt"), type)) string_to_vec2(data, &model.uvs[model.uvCount++]);   
-    else if(string_equals(STRING("vn"), type)) string_to_vec3(data, &model.normals[model.normalCount++]);   
-    else if(string_equals(STRING("f"), type))  {
+    if(string_equals(create_string("v"), type)) string_to_vec3(data, &model.positions[model.positionCount++]);
+    else if(string_equals(create_string("vt"), type)) string_to_vec2(data, &model.uvs[model.uvCount++]);   
+    else if(string_equals(create_string("vn"), type)) string_to_vec3(data, &model.normals[model.normalCount++]);   
+    else if(string_equals(create_string("f"), type))  {
       string_to_face(
         data,
         model.positionCount,
@@ -197,7 +197,6 @@ ObjModel parse_obj(Arena* arena, const String objSource) {
 
 #include "scene_define.c"
 
-#include "data_types/io.c"
 #include "data_types/arena.c"
 #include "opengl_utils.c"
 #include "mesh.c"
@@ -315,10 +314,10 @@ GLTFAttribute load_attribute_from_gltf( Arena* arena, const Array(Bytes)* buffer
   }
 
   uint8_t vecType = 0;
-  if(string_equals(typeStr, STRING("SCALAR"))) vecType = 1;
-  else if(string_equals(typeStr, STRING("VEC2"))) vecType = 2;
-  else if(string_equals(typeStr, STRING("VEC3"))) vecType = 3;
-  else if(string_equals(typeStr, STRING("VEC4"))) vecType = 4;
+  if(string_equals(typeStr, create_string("SCALAR"))) vecType = 1;
+  else if(string_equals(typeStr, create_string("VEC2"))) vecType = 2;
+  else if(string_equals(typeStr, create_string("VEC3"))) vecType = 3;
+  else if(string_equals(typeStr, create_string("VEC4"))) vecType = 4;
 
   if(vecType != expectedVecType) {
     fprintf(stderr, "Vector Type doesn't match");
@@ -541,9 +540,9 @@ Mesh load_mesh_from_gltf(Arena* arena, const Array(Bytes)* bufferArray, const Ar
 #include "data_types/array.c"
 
 Array(Mesh) extract_meshes_from_gltf(Arena* arena, String filePath) {
-  CSTRING(filePath, cFilePath);
+  Ccreate_string(filePath, cFilePath);
   String source = read_file(arena, cFilePath);
-  CSTRING(source, cSource)
+  Ccreate_string(source, cSource)
   cJSON *json = cJSON_Parse(cSource);
   assert(json);
 
@@ -571,7 +570,7 @@ Array(Mesh) extract_meshes_from_gltf(Arena* arena, String filePath) {
     byte* data = arena_alloc_array(arena, byte, buffLen->valueint);
     
     Bytes bytes = (Bytes){data, buffLen->valueint};
-    if(string_contains(uri, STRING("data:"))) {
+    if(string_contains(uri, create_string("data:"))) {
       Cut cut = string_cut(uri, ';');
       cut = string_cut(cut.tail, ',');
       int base = string_to_int(string_span(cut.head.data+4, cut.head.data+cut.head.len));
@@ -591,7 +590,7 @@ Array(Mesh) extract_meshes_from_gltf(Arena* arena, String filePath) {
       resFile.len = strlen(buffURI->valuestring);
 
       String binFilePath = string_concatenate(arena, parentPath, resFile);
-      CSTRING(binFilePath, cBinFile);
+      Ccreate_string(binFilePath, cBinFile);
       
       FILE* file = fopen(cBinFile, "rb");
       if(!file) fprintf(stderr, "There is no binary file %s", cBinFile);
@@ -620,7 +619,7 @@ Array(Mesh) extract_meshes_from_gltf(Arena* arena, String filePath) {
     resFile.len = strlen(imageURI->valuestring);
 
     String binFilePath = string_concatenate(arena, parentPath, resFile);
-    CSTRING(binFilePath, cBinFile);
+    Ccreate_string(binFilePath, cBinFile);
     
     GLuint texture = create_texture(cBinFile);
     
@@ -647,9 +646,9 @@ Array(Mesh) extract_meshes_from_gltf(Arena* arena, String filePath) {
 
 /*
 Scene load_scene_from_gltf(Arena* arena, String filePath) {
-  CSTRING(filePath, cFilePath);
+  Ccreate_string(filePath, cFilePath);
   String source = read_file(arena, cFilePath);
-  CSTRING(source, cSource)
+  Ccreate_string(source, cSource)
   cJSON *json = cJSON_Parse(cSource);
   assert(json);
 
@@ -677,7 +676,7 @@ Scene load_scene_from_gltf(Arena* arena, String filePath) {
     byte* data = arena_alloc_array(arena, byte, buffLen->valueint);
     
     Bytes bytes = (Bytes){data, buffLen->valueint};
-    if(string_contains(uri, STRING("data:"))) {
+    if(string_contains(uri, create_string("data:"))) {
       Cut cut = string_cut(uri, ';');
       cut = string_cut(cut.tail, ',');
       int base = string_to_int(string_span(cut.head.data+4, cut.head.data+cut.head.len));
@@ -697,7 +696,7 @@ Scene load_scene_from_gltf(Arena* arena, String filePath) {
       resFile.len = strlen(buffURI->valuestring);
 
       String binFilePath = string_concatenate(arena, parentPath, resFile);
-      CSTRING(binFilePath, cBinFile);
+      Ccreate_string(binFilePath, cBinFile);
       
       FILE* file = fopen(cBinFile, "rb");
       if(!file) fprintf(stderr, "There is no binary file %s", cBinFile);
@@ -726,7 +725,7 @@ Scene load_scene_from_gltf(Arena* arena, String filePath) {
     resFile.len = strlen(imageURI->valuestring);
 
     String binFilePath = string_concatenate(arena, parentPath, resFile);
-    CSTRING(binFilePath, cBinFile);
+    Ccreate_string(binFilePath, cBinFile);
     
     GLuint texture = create_texture(cBinFile);
     

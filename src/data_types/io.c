@@ -5,11 +5,13 @@
 #include "string.c"
 #include "arena.c"
 
-String read_file(Arena* arena, const char *filename) {
+String read_file(Arena* arena, String filename) {
   FILE *fileptr;
-  fileptr = fopen(filename, "r");
+  char filename_c[filename.len + 1];
+  string_to_c_str(filename, filename_c);
+  fileptr = fopen(filename_c, "r");
   if(!fileptr) {
-    fprintf(stderr, "%s isn't a valid file path", filename);
+    fprintf(stderr, "%s isn't a valid file path\n", filename_c);
     fflush(stderr);
     return (String){0};
   }
@@ -26,10 +28,6 @@ String read_file(Arena* arena, const char *filename) {
   string.data = str;
   string.len = n;
   return string;
-}
-
-void print_string(String string) {
-  printf("%.*s", (int)string.len, string.data);
 }
 
 #endif

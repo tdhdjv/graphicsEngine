@@ -25,9 +25,9 @@ struct Arena {
 };
 
 typedef struct {
-  Arena* arena;
-  size_t markOffset;
-} ArenaMark;
+  Arena* allocator;
+  const size_t markOffset;
+} ScratchArena;
 
 uintptr_t align_forward(uintptr_t ptr, uint8_t alignment) {
   uintptr_t offset = ptr % alignment;
@@ -55,13 +55,14 @@ void* arena_alloc(Arena* arena, size_t n) {
 }
 
 void arena_clear(Arena *arena) { arena->offset = 0; }
-void arena_return_to_mark(ArenaMark* mark) { mark->arena->offset = mark->markOffset; }
-
 Arena create_arena(char*data, size_t capcity) { return (Arena){.data=data, .offset=0, .capcity=capcity}; }
-ArenaMark create_arena_mark(Arena* arena) { return (ArenaMark){.arena=arena, .markOffset=arena->offset}; }
+
+ScratchArena create_scratch_arena(Arena* arena) { return (ScratchArena){.allocator=arena, .markOffset=arena->offset}; }
+void release_scratch_arena(ScratchArena mark) { mark.allocator->offset = mark.markOffset; }
 
 void free_arena(Arena* arena) { free(arena->data); }
 
 #define arena_alloc_array(arena, type, n) arena_alloc(arena, sizeof(type) * n)
 #define arena_alloc_struct(arena, type) arena_alloc(arena, sizeof(type))
+
 #endif

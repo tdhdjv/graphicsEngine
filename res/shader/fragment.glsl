@@ -8,12 +8,13 @@ in vec3 lightDir;
 
 // material parameters
 uniform sampler2D albedoMap;
-uniform sampler2D normalMap;
+//uniform sampler2D normalMap;
 uniform sampler2D roughnessMetallicMap;
-uniform sampler2D aoMap;
+//uniform sampler2D aoMap;
 uniform sampler2D emissiveMap;
 uniform samplerCube prefilterMap;
-uniform sampler2D brdfLUT;
+//uniform sampler2D brdfLUT;
+//uniform samplerCube irradiationMap;
 
 uniform vec3 albedoFactor;
 uniform float metallicFactor;
@@ -30,6 +31,7 @@ const float PI = 3.14159265359;
 // mapping the usual way for performance anyways; I do plan make a note of this 
 // technique somewhere later in the normal mapping tutorial.
 vec3 getNormalFromMap() {
+  /*
   vec3 tangentNormal = texture(normalMap, TexCoords).xyz * 2.0 - 1.0;
 
   vec3 Q1  = dFdx(WorldPos);
@@ -41,7 +43,9 @@ vec3 getNormalFromMap() {
   vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
   vec3 B  = -normalize(cross(N, T));
   mat3 TBN = mat3(T, B, N);
+  */
 
+  vec3 N = normalize(Normal);
   return N;//normalize(TBN * tangentNormal);
 }
 // ----------------------------------------------------------------------------
@@ -93,7 +97,6 @@ void main() {
   vec3 albedo     = pow((texture(albedoMap, TexCoords)).rgb * albedoFactor, vec3(2.2));
   float roughness = texture(roughnessMetallicMap, TexCoords).g * roughnessFactor;
   float metallic  = texture(roughnessMetallicMap, TexCoords).b * metallicFactor;
-  //float ao        = texture(aoMap, TexCoords).r;
 
   vec3 N = getNormalFromMap();
   vec3 V = normalize(camPos - WorldPos);
@@ -104,7 +107,7 @@ void main() {
   vec3 F0 = vec3(0.04); 
   F0 = mix(F0, albedo, metallic);
 
-  vec3 lights[4] = vec3[](vec3(0.5, 0.5, -1.0), vec3(-0.5, 0.5, -1.0), vec3(-0.5, -0.5, -1.0), vec3(0.5, -0.5, -1.0)); 
+  vec3 lights[4] = vec3[](vec3(0.5, 0.5, 1.0), vec3(-0.5, 0.5, 1.0), vec3(-0.5, -0.5, 1.0), vec3(0.5, -0.5, 1.0)); 
 
   // reflectance equation
   vec3 Lo = vec3(0.0);
@@ -145,15 +148,24 @@ void main() {
   }   
   vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
 
-  // ambient lighting (note that the next IBL tutorial will replace 
-  // this ambient lighting with environment lighting).
-  const float MAX_REFLECTION_LOD = 4.0;
-  vec3 prefilteredColor = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
-  prefilteredColor = prefilteredColor/(vec3(1.01) - prefilteredColor);
-  vec2 envBRDF  = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
-  vec3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
+  vec3 kS = F;
+  vec3 kD = 1.0 - kS;
+  kD *= 1.0 - metallic;
 
-  vec3 ambient = pow(specular, vec3(2.2)) + albedo * vec3(0.01);
+  /*
+  vec3 irradiance = texture(irradiationMap, N).rgb;
+  irradiance = irradiance / (vec3(1.01) - irradiance);
+  vec3 diffuse = 0.01 * irradiance * albedo;
+  */
+
+  // this ambient lighting with environment lighting).
+  //const float MAX_REFLECTION_LOD = 4.0;
+  vec3 prefilteredColor = texture(prefilterMap, R).rgb;//textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
+  prefilteredColor = prefilteredColor/(vec3(1.01) - prefilteredColor);
+  //vec2 envBRDF  = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+  vec3 specular = prefilteredColor;// * (F * envBRDF.x + envBRDF.y);
+
+  vec3 ambient = specular;
   vec3 emissive = texture2D(emissiveMap, TexCoords).rgb * emissiveFactor;
   
   vec3 color = ambient + Lo + 10.0 * emissive;

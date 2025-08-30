@@ -1,8 +1,8 @@
 #!/bin/bash
 
 clang src/main.c glad/glad.o dependencies/stb_image/stb_image.o dependencies/cJSON/cJSON.c\
-  -o exe\
+  -o renderDocExe\
   -lm -lglfw -Idependencies/cJSON -Idependencies/stb_image/include -Iglad/include -Idependencies/cglm/include\
-  -pg -Wall -Werror -fsanitize=address -g
-export ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer
-export LSAN_OPTIONS="suppressions=$PWD/build/asan_suppressions.txt:print_suppressions=0"
+  -pg -Wall -Werror -g
+
+env GLFW_USE_WAYLAND=0 $PWD/renderDocExe

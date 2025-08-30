@@ -10,22 +10,21 @@
 #include <stdio.h>
 
 #include "data_types/array.c"
-
+#include "data_types/arena.c"
 #include "scene_define.c"
 
-DEFINE_ARRAY(Attribute)
-Geometry generate_geometry(void* vertexData, size_t vertexCount, const Array(Attribute)* attributes, uint32_t *indexData, size_t indexCount) {
-  //pre calculations
-  size_t stride = 0;
-  for(size_t i = 0; i < attributes->capacity; i++) {
-    Attribute attribute = array_get(Attribute, attributes, i);
-    if(attribute.type == GL_FLOAT) stride += sizeof(float)*attribute.vec_dimension;
-    if(attribute.type == GL_UNSIGNED_INT) stride += sizeof(unsigned)*attribute.vec_dimension;
-    if(attribute.type == GL_UNSIGNED_SHORT) stride += sizeof(unsigned short)*attribute.vec_dimension;
-    if(attribute.type == GL_INT) stride += sizeof(int)*attribute.vec_dimension;
-    if(attribute.type == GL_SHORT) stride += sizeof(short)*attribute.vec_dimension;
-  };
-    
+RenderData generate_render_data(Arena* arena, const Geometry* geometry) {
+  //We assume that the position data is always present
+  uint32_t vertexCount = geometry->positions.length;
+  size_t indexCount = geometry->indices.length;
+
+  uint16_t stride = 3*sizeof(float);
+  bool hasNormals = geometry->normals.length != 0;
+  bool hasTexCoord = geometry->textureCoordinates.length != 0;
+
+  if(hasNormals) stride += 3*sizeof(float);
+  if(hasTexCoord) stride += 2*sizeof(float);
+
   GLuint VBO, VAO, EBO;
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
@@ -34,57 +33,106 @@ Geometry generate_geometry(void* vertexData, size_t vertexCount, const Array(Att
   // then configure vertex attributes(s).
   glBindVertexArray(VAO);
 
+  ScratchArena scratch = create_scratch_arena(arena);
+  char* vertexData = arena_alloc(arena, vertexCount*stride);
+
+  size_t offset = 0;
+  for(size_t i = 0; i < vertexCount; i++) {
+    memcpy(vertexData + offset, geometry->positions.data + i, 3*sizeof(float));
+    offset += 3*sizeof(float);
+    if(hasNormals) {
+      memcpy(vertexData + offset, geometry->normals.data + i, 3*sizeof(float));
+      offset += 3*sizeof(float);
+    }
+    if(hasTexCoord) {
+      memcpy(vertexData + offset, geometry->textureCoordinates.data + i, 2*sizeof(float));
+      offset += 2*sizeof(float);
+    }
+  }
+/*
+  for(size_t i = 0; i < vertexCount; i++) {
+    char* vD = vertexData + (stride * i);
+    printf("pos: %f, %f, %f\n", *(float*)vD, *(float*)(vD+sizeof(float)), *(float*)(vD+2*sizeof(float)));
+    printf("normal: %f, %f, %f\n", *(float*)(vD + 3*sizeof(float)), *(float*)(vD+4*sizeof(float)), *(float*)(vD+5*sizeof(float)));
+    printf("texCoord: %f, %f\n--------------------------\n", *(float*)(vD + 6*sizeof(float)), *(float*)(vD+7*sizeof(float)));
+  }
+
+  for(size_t i = 0; i < indexCount; i++) {
+    printf("indices: %d\n", geometry->indices.data[i]);
+  }
+  fflush(stdout);
+
+  */
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, stride*vertexCount, vertexData,GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * indexCount,indexData, GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * indexCount,geometry->indices.data, GL_STATIC_DRAW);
 
-  size_t offset = 0;
-  for(size_t i = 0; i < attributes->capacity; i++) {
-    Attribute attribute = array_get(Attribute, attributes, i);
-    glVertexAttribPointer(i, attribute.vec_dimension, attribute.type, GL_FALSE, stride, (void *)offset);
-    if(attribute.type == GL_FLOAT) offset += sizeof(float)*attribute.vec_dimension;
-    if(attribute.type == GL_UNSIGNED_INT) offset += sizeof(unsigned)*attribute.vec_dimension;
-    if(attribute.type == GL_UNSIGNED_SHORT) offset += sizeof(unsigned short)*attribute.vec_dimension;
-    if(attribute.type == GL_INT) offset += sizeof(int)*attribute.vec_dimension;
-    if(attribute.type == GL_SHORT) offset += sizeof(short)*attribute.vec_dimension;
-    glEnableVertexAttribArray(i);
+  offset = 0;
+
+  glVertexAttribPointer(0,3, GL_FLOAT, GL_FALSE, stride, (void *)offset);
+  glEnableVertexAttribArray(0);
+  offset += 3*sizeof(float);
+
+  if(hasNormals) {
+    glVertexAttribPointer(1,3, GL_FLOAT, GL_FALSE, stride, (void *)offset);
+    glEnableVertexAttribArray(1);
+    offset += 3*sizeof(float);
   }
 
-  return (Geometry){VAO, VBO, EBO, indexCount};
+  if(hasTexCoord) {
+    glVertexAttribPointer(2,2, GL_FLOAT, GL_FALSE, stride, (void *)offset);
+    glEnableVertexAttribArray(2);
+    offset += 2*sizeof(float);
+  }
+
+  release_scratch_arena(scratch);
+
+  return (RenderData){VAO, VBO, EBO ,indexCount};
 }
 
-Geometry generate_quad_geometry(Arena* arena, vec3 horizontal, vec3 vertical, uint32_t subDivision) {
+RenderData generate_quad(Arena* arena, vec3 horizontal, vec3 vertical, uint32_t subDivision) {
   size_t vertexCount = (subDivision + 2) * (subDivision + 2);
   size_t indexCount = 6 * (subDivision + 1) * (subDivision + 1);
-  float vertexData[vertexCount * 8];
-  uint32_t indexData[indexCount];
+  
+  ScratchArena scratchArena = create_scratch_arena(arena);
 
-  vec3 normal;
-  glm_cross(horizontal, vertical, normal);
-  glm_normalize(normal);
+  vec3* positionData = arena_alloc_array(scratchArena.allocator, vec3, vertexCount);
+  vec3* normalData = arena_alloc_array(scratchArena.allocator, vec3, vertexCount);
+  vec2* texCoordData = arena_alloc_array(scratchArena.allocator, vec2, vertexCount);
+  uint32_t* indexData = arena_alloc_array(scratchArena.allocator, int32_t, indexCount);
+  
+  Array(vec3) positionArray =  create_array(vec3, positionData, vertexCount);
+  Array(vec3) normalArray =  create_array(vec3, normalData, vertexCount);
+  Array(vec2) texCoordArray = create_array(vec2, texCoordData, vertexCount);
+  Array(uint32_t) indexArray = create_array(uint32_t, indexData, indexCount);
+  Geometry geometry = (Geometry){positionArray, normalArray, texCoordArray, indexArray};
 
-  uint32_t n = 0;
+  vec3 quadNormal;
+  glm_cross(horizontal, vertical, quadNormal);
+  glm_normalize(quadNormal);
 
   for (uint32_t i = 0; i < subDivision + 2; i++) {
     for (uint32_t j = 0; j < subDivision + 2; j++) {
       float u = ((float)i) / (float)(subDivision + 1) - 0.5f;
       float v = ((float)j) / (float)(subDivision + 1) - 0.5f;
-      vertexData[n++] = horizontal[0] * u + vertical[0] * v;
-      vertexData[n++] = horizontal[1] * u + vertical[1] * v;
-      vertexData[n++] = horizontal[2] * u + vertical[2] * v;
+      uint32_t index = j + i*(subDivision+2);
 
-      vertexData[n++] = normal[0];
-      vertexData[n++] = normal[1];
-      vertexData[n++] = normal[2];
+      positionData[index][0] = horizontal[0] * u + vertical[0] * v;
+      positionData[index][1] = horizontal[1] * u + vertical[1] * v;
+      positionData[index][2] = horizontal[2] * u + vertical[2] * v;
 
-      vertexData[n++] = u;
-      vertexData[n++] = v;
+      normalData[index][0] = quadNormal[0];
+      normalData[index][1] = quadNormal[1];
+      normalData[index][2] = quadNormal[2];
+      
+      texCoordData[index][0] = u;
+      texCoordData[index][1] = v;
     }
   }
 
-  n = 0;
+  size_t n = 0;
 
   for (uint32_t i = 0; i < subDivision + 1; i++) {
     for (uint32_t j = 0; j < subDivision + 1; j++) {
@@ -97,28 +145,32 @@ Geometry generate_quad_geometry(Arena* arena, vec3 horizontal, vec3 vertical, ui
       indexData[n++] = firstIndex + (subDivision + 2) + 1;
     }
   }
-  Attribute* attributeData = arena_alloc_array(arena, Attribute, 3);
-  Array(Attribute) attributes = create_array(Attribute, attributeData, 3);
-  Attribute positonAttrib = (Attribute){GL_FLOAT, 3};
-  Attribute normalAttrib = (Attribute){GL_FLOAT, 3};
-  Attribute texCoordAttrib = (Attribute){GL_FLOAT, 2};
-  array_set(Attribute, &attributes, 0, positonAttrib);
-  array_set(Attribute, &attributes, 1, normalAttrib);
-  array_set(Attribute, &attributes, 2, texCoordAttrib);
 
-  return generate_geometry(vertexData, vertexCount, &attributes, indexData, indexCount);
+  RenderData renderData = generate_render_data(arena, &geometry);
+  release_scratch_arena(scratchArena);
+
+  return renderData;
 }
 
 // Math behind this is explained in /documentation/icosphere.md
-Geometry generate_icosphere_geometry(Arena* arena, uint32_t subDivision) {
+RenderData generate_icosphere(Arena* arena, uint32_t subDivision) {
+  RenderData result;
+
   size_t vertexCount = 10 * (subDivision + 1) * (subDivision + 1) + 2;
   size_t indexCount = 60 * (subDivision + 1) * (subDivision + 1);
 
-  Geometry result = {0};
+  ScratchArena scratchArena = create_scratch_arena(arena);
 
-  ArenaMark mark = create_arena_mark(arena);
-  float* vertexData = arena_alloc_array(arena, float, vertexCount * 6);
-  uint32_t* indexData = arena_alloc_array(arena, int, indexCount);
+  vec3* positionData = arena_alloc_array(scratchArena.allocator, vec3, vertexCount);
+  vec3* normalData = arena_alloc_array(scratchArena.allocator, vec3, vertexCount);
+  vec2* texCoordData = arena_alloc_array(scratchArena.allocator, vec2, vertexCount);
+  uint32_t* indexData = arena_alloc_array(scratchArena.allocator, int32_t, indexCount);
+
+  Array(vec3) positionArray =  create_array(vec3, positionData, vertexCount);
+  Array(vec3) normalArray =  create_array(vec3, normalData, vertexCount);
+  Array(vec2) texCoordArray = create_array(vec2, texCoordData, vertexCount);
+  Array(uint32_t) indexArray = create_array(uint32_t, indexData, indexCount);
+  Geometry geometry = (Geometry){positionArray, normalArray, texCoordArray, indexArray};
 
   float phi = 0.5 * (1.0 + sqrt(5.0));
   vec3 northPole = {0.0, 1.0, phi};
@@ -136,24 +188,28 @@ Geometry generate_icosphere_geometry(Arena* arena, uint32_t subDivision) {
 
   vec3 *strips[5] = {strip1, strip2, strip3, strip4, strip5};
 
-  size_t n = 0;
   vec3 normalizedNorth;
   glm_normalize_to(northPole, normalizedNorth);
   //position
-  vertexData[n++] = normalizedNorth[0];
-  vertexData[n++] = normalizedNorth[1];
-  vertexData[n++] = normalizedNorth[2];
+      
+  positionData[0][0] = normalizedNorth[0];
+  positionData[0][1] = normalizedNorth[1];
+  positionData[0][2] = normalizedNorth[2];
   
   //normal
-  vertexData[n++] = normalizedNorth[0];
-  vertexData[n++] = normalizedNorth[1];
-  vertexData[n++] = normalizedNorth[2];
+  normalData[0][0]  = normalizedNorth[0];
+  normalData[0][1]  = normalizedNorth[1];
+  normalData[0][2]  = normalizedNorth[2];
+
+  const size_t vertexPerRow   = 2 * (subDivision + 1);
+  const size_t vertexPerStrip = vertexPerRow * (subDivision + 1);
 
   for (int i = 0; i < 5; i++) {
     vec3 *strip = strips[i];
     for (uint32_t j = 0; j < subDivision + 1; j++) {
-      for (uint32_t k = 0; k < 2 * (subDivision + 1); k++) {
+      for (uint32_t k = 0; k < vertexPerRow; k++) {
         vec3 vertex;
+        size_t index = k + j * vertexPerRow + i * vertexPerStrip + 1;
         glm_vec3_zero(vertex);
 
         float u = (float)(k) / (float)(subDivision + 1);
@@ -197,32 +253,30 @@ Geometry generate_icosphere_geometry(Arena* arena, uint32_t subDivision) {
         glm_normalize(vertex);
 
         //position
-        vertexData[n++] = vertex[0];
-        vertexData[n++] = vertex[1];
-        vertexData[n++] = vertex[2];
+        positionData[index][0] = vertex[0];
+        positionData[index][1] = vertex[1];
+        positionData[index][2] = vertex[2];
         
         //normal
-        vertexData[n++] = vertex[0];
-        vertexData[n++] = vertex[1];
-        vertexData[n++] = vertex[2];
+        normalData[index][0] = vertex[0];
+        normalData[index][1] = vertex[1];
+        normalData[index][2] = vertex[2];
       }
     }
   }
 
   glm_normalize(southPole);
   //position
-  vertexData[n++] = southPole[0];
-  vertexData[n++] = southPole[1];
-  vertexData[n++] = southPole[2];
-
-  //normal
-  vertexData[n++] = southPole[0];
-  vertexData[n++] = southPole[1];
-  vertexData[n++] = southPole[2];
+  positionData[vertexCount-1][0] = southPole[0];
+  positionData[vertexCount-1][1] = southPole[1];
+  positionData[vertexCount-1][2] = southPole[2];
   
-  n = 0;
-  size_t vertexPerRow = 2 * (subDivision + 1);
-  size_t vertexPerStrip = vertexPerRow * (subDivision + 1);
+  //normal
+  normalData[vertexCount-1][0] = southPole[0];
+  normalData[vertexCount-1][1] = southPole[1];
+  normalData[vertexCount-1][2] = southPole[2];
+  
+  size_t n = 0;
 
   for (int i = 0; i < 5; i++) {
     for (uint32_t j = 0; j < subDivision; j++) {
@@ -294,16 +348,8 @@ Geometry generate_icosphere_geometry(Arena* arena, uint32_t subDivision) {
       indexData[n++] = secondIndex;
     }
   }
-  Attribute* attributeData = arena_alloc_array(arena, Attribute, 2);
-  Array(Attribute) attributes = create_array(Attribute, attributeData, 2);
-  Attribute positonAttrib = (Attribute){GL_FLOAT, 3};
-  Attribute normalAttrib = (Attribute){GL_FLOAT, 3};
-  array_set(Attribute, &attributes, 0, positonAttrib);
-  array_set(Attribute, &attributes, 1, normalAttrib);
-
-  result = generate_geometry(vertexData, vertexCount, &attributes, indexData, indexCount);
-
-  arena_return_to_mark(&mark);
+  result = generate_render_data(arena, &geometry);
+  release_scratch_arena(scratchArena);
 
   return result;
 }

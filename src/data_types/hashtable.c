@@ -10,6 +10,7 @@
 #define HashTable(key_t, value_t) key_t##_##value_t##_Table
 #define KeyValue(key_t, value_t) key_t##_##value_t##_Pair
 #define create_hash_table(key_t, value_t, data, capacity) create_##key_t##_##value_t##_table(data, capacity)
+#define hash_table_index(key_t, value_t, table, key) key_t##_##value_t##_table_index(table, key)
 #define hash_table_set(key_t, value_t, table, key, value) key_t##_##value_t##_table_set(table, key, value)
 #define hash_table_get(key_t, value_t, table, key, defaultValue) key_t##_##value_t##_table_get(table, key, defaultValue)
 #define hash_table_contains(key_t, value_t, table, key) key_t##_##value_t##_table_contains(table, key)
@@ -34,6 +35,10 @@
     assert(false);\
   }\
 \
+  value_t* key_t##_##value_t##_table_index(key_t##_##value_t##_Table* table, key_t key) {\
+    key_t##_##value_t##_Pair* pair = key_t##_##value_t##_table_look_up(table, key);\
+    return &pair->value;\
+  }\
   void key_t##_##value_t##_table_set(key_t##_##value_t##_Table* table, key_t key, value_t value) {\
     key_t##_##value_t##_Pair* pair = key_t##_##value_t##_table_look_up(table, key);\
     pair->taken = true;\
@@ -41,9 +46,15 @@
     pair->value = value;\
   }\
 \
-  value_t key_t##_##value_t##_table_get(key_t##_##value_t##_Table* table, key_t key, value_t default_value) {\
-    key_t##_##value_t##_Pair* pair = key_t##_##value_t##_table_look_up(table, key);\
-    if(pair->taken) return pair->value;\
+  value_t key_t##_##value_t##_table_get(const key_t##_##value_t##_Table* table, key_t key, value_t default_value) {\
+    uint64_t hashValue = hashFunc(key);\
+    key_t##_##value_t##_Pair* pair;\
+    for(size_t index = (hashValue%table->capacity); index < table->capacity; index++) {\
+      if(!table->table[index].taken || isEqual(table->table[index].key, key)) {\
+        pair = table->table + index;\
+        return pair->value;\
+      }\
+    }\
     return default_value;\
   }\
 \

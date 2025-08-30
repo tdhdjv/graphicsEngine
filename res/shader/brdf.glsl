@@ -3,6 +3,7 @@ out vec2 FragColor;
 in vec2 TexCoords;
 
 const float PI = 3.14159265359;
+
 // ----------------------------------------------------------------------------
 // http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
 // efficient VanDerCorpus calculation.
