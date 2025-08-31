@@ -10,7 +10,7 @@
 
 Texture whiteTexture;
 
-void setup_material(void) {
+void setup_material(Arena* arena) {
   whiteTexture = create_texture("res/white.png");
 }
 
@@ -124,12 +124,24 @@ void material_push_uniform_values(const Material* material) {
   }
 }
 
+bool material_contains_uniform(Material* material, String uniformName) {
+  return hash_table_index(String, UniformValue, &material->uniformProperties, uniformName);
+}
+
 void material_set_mat4(Material* material, String uniformName, mat4 mat4Value) {
+  if(!hash_table_contains(String, UniformValue, &material->uniformProperties, uniformName)) {
+    fprintf(stderr, "Shader %d There is not uniform called %.*s\n", material->shaderProgram->id, (int)uniformName.len, uniformName.data);
+    fflush(stderr);
+  }
   UniformValue* uniformValue = hash_table_index(String, UniformValue, &material->uniformProperties, uniformName);
   glm_mat4_copy(mat4Value, uniformValue->mat4Value);
 }
 
 void material_set_vec3(Material* material, String uniformName, const vec3 vec3Value) {
+  if(!hash_table_contains(String, UniformValue, &material->uniformProperties, uniformName)) {
+    fprintf(stderr, "Shader %d There is not uniform called %.*s\n", material->shaderProgram->id, (int)uniformName.len, uniformName.data);
+    fflush(stderr);
+  }
   UniformValue* uniformValue = hash_table_index(String, UniformValue, &material->uniformProperties, uniformName);
   uniformValue->vec3Value[0] = vec3Value[0];
   uniformValue->vec3Value[1] = vec3Value[1];
@@ -137,10 +149,28 @@ void material_set_vec3(Material* material, String uniformName, const vec3 vec3Va
 }
 
 void material_set_float(Material* material, String uniformName, float floatValue) {
+  if(!hash_table_contains(String, UniformValue, &material->uniformProperties, uniformName)) {
+    fprintf(stderr, "Shader %d There is not uniform called %.*s\n", material->shaderProgram->id, (int)uniformName.len, uniformName.data);
+    fflush(stderr);
+  }
   UniformValue* uniformValue = hash_table_index(String, UniformValue, &material->uniformProperties, uniformName);
   uniformValue->floatValue = floatValue;
 }
+
+void material_set_int(Material* material, String uniformName, int intValue) {
+  if(!hash_table_contains(String, UniformValue, &material->uniformProperties, uniformName)) {
+    fprintf(stderr, "Shader %d There is not uniform called %.*s\n", material->shaderProgram->id, (int)uniformName.len, uniformName.data);
+    fflush(stderr);
+  }
+  UniformValue* uniformValue = hash_table_index(String, UniformValue, &material->uniformProperties, uniformName);
+  uniformValue->intValue = intValue;
+}
+
 void material_set_texture(Material* material, String uniformName, Texture texture) {
+  if(!hash_table_contains(String, SamplerValue, &material->samplerProperties, uniformName)) {
+    fprintf(stderr, "Shader %d There is not uniform called %.*s\n", material->shaderProgram->id, (int)uniformName.len, uniformName.data);
+    fflush(stderr);
+  }
   SamplerValue* samplerValue = hash_table_index(String, SamplerValue, &material->samplerProperties, uniformName);
   samplerValue->texture = texture;
 }

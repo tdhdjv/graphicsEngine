@@ -8,7 +8,7 @@
 #include "material.c"
 
 static GLuint captureFbo;
-//static GLuint captureRbo;
+static GLuint captureRbo;
 static mat4 captureViews[6];
 static mat4 captureProjection;
 
@@ -17,6 +17,7 @@ static GLuint cubeMapVAO;
 //Sets up the values and objects used for environment mapping
 void setup_environment_map(void) { 
   glGenFramebuffers(1, &captureFbo);
+  glGenRenderbuffers(1, &captureRbo);
   //view matrices
   vec3 origin = {0.0, 0.0, 0.0};
   vec3 up = {0.0, 1.0, 0.0};
@@ -127,7 +128,74 @@ GLuint create_environment_map(const char* right, const char* left, const char* t
   return textureID;
 }
 
+GLuint create_reflection_probe_env_mip_map(uint16_t length, Texture envMap, Material* captureMaterial, unsigned char maxMipMap) {
+  glDisable(GL_CULL_FACE);
+  glBindFramebuffer(GL_FRAMEBUFFER, captureFbo);
+  GLuint probeMap;
+  glGenTextures(1, &probeMap);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, probeMap);
+
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+  for(unsigned i = 0; i < 6; i++) {
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, length, length, 0, GL_RGB, GL_FLOAT, NULL);
+  }
+
+  glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+  material_set_texture(captureMaterial, create_string_from_literal("environmentMap"), envMap);
+  material_set_mat4(captureMaterial, create_string_from_literal("projectionMatrix"), captureProjection);
+  glUseProgram(captureMaterial->shaderProgram->id);
+
+  if(material_contains_uniform(captureMaterial, create_string_from_literal("maxMipMap"))) {
+    material_set_int(captureMaterial, create_string_from_literal("maxMipMap"), maxMipMap);
+  }
+  for(int mip = 0; mip < maxMipMap; mip++) {
+    if(material_contains_uniform(captureMaterial, create_string_from_literal("mipMap"))) {
+      material_set_int(captureMaterial, create_string_from_literal("mipMap"), mip);
+    }
+
+    uint16_t mipMapLength = length  >> mip;
+    glViewport(0, 0, mipMapLength, mipMapLength);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipMapLength, mipMapLength);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRbo);
+
+    for(unsigned i = 0; i < 6; i++) {
+      glBindTexture(GL_TEXTURE_CUBE_MAP, probeMap);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, probeMap, mip);
+      material_set_mat4(captureMaterial, create_string_from_literal("viewMatrix"), captureViews[i]);
+      if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        fprintf(stderr, "Framebuffer incomplete!");
+        fflush(stderr);
+        abort();
+      }
+      material_push_uniform_values(captureMaterial);
+
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glBindVertexArray(cubeMapVAO);
+      glDrawArrays(GL_TRIANGLES, 0, 36);  
+    }
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glEnable(GL_CULL_FACE);
+  //change later
+  glViewport(0, 0, 1000, 800);
+  return probeMap;
+}
+
 GLuint create_reflection_probe_env(uint16_t length, Texture envMap, Material* captureMaterial) {
+  glDisable(GL_CULL_FACE);
+  glBindFramebuffer(GL_FRAMEBUFFER, captureFbo);
+
+  glBindRenderbuffer(GL_RENDERBUFFER, captureRbo);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, length, length);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRbo);
+
   GLuint probeMap;
   glGenTextures(1, &probeMap);
   glBindTexture(GL_TEXTURE_CUBE_MAP, probeMap);
@@ -141,25 +209,33 @@ GLuint create_reflection_probe_env(uint16_t length, Texture envMap, Material* ca
   for(unsigned i = 0; i < 6; i++) {
     glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, length, length, 0, GL_RGB, GL_FLOAT, NULL);
   }
-  if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-    fprintf(stderr, "Framebuffer incomplete!");
-    fflush(stderr);
-    abort();
-  }
 
-  material_set_texture(captureMaterial, create_string_from_literal("evironmentMap"), envMap);
+  material_set_texture(captureMaterial, create_string_from_literal("environmentMap"), envMap);
   material_set_mat4(captureMaterial, create_string_from_literal("projectionMatrix"), captureProjection);
   glUseProgram(captureMaterial->shaderProgram->id);
   glViewport(0, 0, length, length);
 
   for(unsigned i = 0; i < 6; i++) {
+    glBindTexture(GL_TEXTURE_CUBE_MAP, probeMap);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, probeMap, 0);
+
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+      fprintf(stderr, "Framebuffer incomplete!");
+      fflush(stderr);
+      abort();
+    }
+
     material_set_mat4(captureMaterial, create_string_from_literal("viewMatrix"), captureViews[i]);
+    material_push_uniform_values(captureMaterial);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glBindVertexArray(cubeMapVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);  
   }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glEnable(GL_CULL_FACE);
+  //change later
+  glViewport(0, 0, 1000, 800);
 
   return probeMap;
 }

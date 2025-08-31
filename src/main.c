@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "data_types/arena.c"
+#include "pbr.c"
 //#include "data_types/pool.c"
 //#include "resource.c"
 #include "data_types/array.c"
@@ -382,7 +383,7 @@ int main(void) {
   //skybox setup
   setup_environment_map();
   setup_render();
-  setup_material();
+  setup_material(&arena);
 
   ShaderProgram skyboxShader = create_shader_program();
   attach_shader_to_program(&arena, &skyboxShader, GL_VERTEX_SHADER, create_string_from_literal("res/shader/skyboxVertex.glsl"));
@@ -392,32 +393,22 @@ int main(void) {
 
   Material skyBoxMaterial = create_material(&arena, &skyboxShader);
   Texture environmentMap = create_environment_map("res/skybox/right.jpg", "res/skybox/left.jpg", "res/skybox/top.jpg", "res/skybox/bottom.jpg", "res/skybox/front.jpg", "res/skybox/back.jpg");
+
+  setup_pbr(&arena, environmentMap);
   material_set_texture(&skyBoxMaterial, create_string_from_literal("environmentMap"), environmentMap);
 
   Mesh* meshArrayData = arena_alloc_array(&arena, Mesh, 64);
   Array(Mesh) meshes =  create_array(Mesh, meshArrayData, 64);
-
-  ShaderProgram materialShader = create_shader_program();
-  attach_shader_to_program(&arena, &materialShader, GL_VERTEX_SHADER, create_string_from_literal("res/shader/vertex.glsl"));
-  attach_shader_to_program(&arena, &materialShader, GL_FRAGMENT_SHADER, create_string_from_literal("res/shader/fragment.glsl"));
-  finalize_shader_program(&materialShader);
-  glUseProgram(materialShader.id);
-  vec3 color = {1.0, 0.0, 0.0};
+  vec3 albedo = {1.0, 0.0, 0.0};
+  vec3 emissive = {0.0, 0.0, 0.0};
 
   //mesh setup
   for(int i = 0; i < 8; i++) { 
     for(int j = 0; j < 8; j++) {
       Mesh mesh = {0};
       mesh.renderData = generate_icosphere(&arena, 16);
-      mesh.material = create_material(&arena, &materialShader);
-      material_set_texture(&mesh.material, create_string_from_literal("albedoMap"), whiteTexture);
-      material_set_texture(&mesh.material, create_string_from_literal("normalMap"), whiteTexture);
-      material_set_texture(&mesh.material, create_string_from_literal("roughtnessMetallicMap"), whiteTexture);
-      material_set_texture(&mesh.material, create_string_from_literal("emissiveMap"), whiteTexture);
-      material_set_float(&mesh.material, create_string_from_literal("metallicFactor"), (float)(i)/7);
-      material_set_float(&mesh.material, create_string_from_literal("roughnessFactor"), (float)(j+1)/7);
-      material_set_vec3(&mesh.material, create_string_from_literal("albedoFactor"), color);
-      material_set_texture(&mesh.material, create_string_from_literal("prefilterMap"), environmentMap);
+      
+      mesh.material = create_pbr_material_values(&arena, albedo, ((float)i)/7.0f, ((float)j)/7.0f, emissive);
       mat4 modelMatrix = GLM_MAT4_IDENTITY_INIT;
       vec3 translation = {-j*2.2, i*2.2 , 10.0};
       glm_translate(modelMatrix, translation);
