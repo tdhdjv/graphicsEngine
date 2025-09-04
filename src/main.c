@@ -14,8 +14,6 @@
 
 #include "data_types/arena.c"
 #include "pbr.c"
-//#include "data_types/pool.c"
-//#include "resource.c"
 #include "data_types/array.c"
 #include "data_types/string.c"
 #include "scene_define.c"
@@ -24,8 +22,13 @@
 #include "environment_map.c"
 #include "render.c"
 #include "mesh.c"
+#include "post_process.c"
 
 GLFWwindow* window;
+static int windowWidth, windowHeight;
+
+GLuint fbo, rbo;
+Texture frameTexture;
 
 void input(GLFWwindow *window, Camera *cam, float dt) {
   float speed = 5.0;
@@ -73,13 +76,21 @@ void input(GLFWwindow *window, Camera *cam, float dt) {
   glm_vec3_normalize(cam->facing);
 }
 
-void GLAPIENTRY
-  MessageCallBack(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
+void GLAPIENTRY message_call_back(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
   fprintf(stderr, "OpenGL Error: %s\n", message);
   fflush(stderr);
 }
 
-void init_window(void) {
+void window_resize_call_back(GLFWwindow* window, int width, int height) {
+  glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
+  glBindTexture(GL_TEXTURE_2D, frameTexture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+
+  glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, windowWidth, windowHeight);
+}
+
+void init_window(uint16_t width, uint16_t height) {
 
   if (!glfwInit()) {
     fprintf(stderr, "Failed to initialize glfw\n");
@@ -94,7 +105,8 @@ void init_window(void) {
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
   // Create a windowed mode window and its OpenGL context
-  window = glfwCreateWindow(1000, 800, "Hello World", NULL, NULL);
+  windowWidth = width, windowHeight = height;
+  window = glfwCreateWindow(windowWidth, windowHeight, "Hello World", NULL, NULL); 
 
   if (!window) {
     glfwTerminate();
@@ -112,11 +124,7 @@ void init_window(void) {
     fflush(stderr);
     abort();
   }
-  /*
-  GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-  const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-  */
-  glViewport(0, 0, 1000, 800);//mode->width, mode->height);
+  glViewport(0, 0, 1000, 800);
 
   glEnable(GL_CULL_FACE);
   glEnable(GL_DEPTH_TEST);
@@ -124,267 +132,51 @@ void init_window(void) {
   glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
   glEnable(GL_DEBUG_OUTPUT);
 
-  glDebugMessageCallback(MessageCallBack, 0);
-}
-
-void clean_up(void) {
-  
+  glDebugMessageCallback(message_call_back, 0);
+  glfwSetWindowSizeCallback(window, window_resize_call_back);
+  glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
 }
 
 int main(void) {
 
-  init_window();
-  float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
-        // positions   // texCoords
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-  };
-
-  unsigned quadVAO, quadVBO;
-
-  glGenVertexArrays(1, &quadVAO);
-  glGenBuffers(1, &quadVBO);
-  glBindVertexArray(quadVAO);
-  glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-  glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-  glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+  init_window(1000, 800);
 
   char* data = malloc(1<<27);
   Arena arena = create_arena(data, 1<<27);
 
-  // pool
-  //Camera camera = {{0,0,0}, {0, 0, 1}};
-  //Mesh* meshArrayData = arena_alloc_array(&arena, Mesh, 49);
-  //Array(Mesh) meshes;// =  create_array(Mesh, meshArrayData, 49);
-  //vec3 up = {0, 1, 0}, right = {1, 0, 0}; 
-  
-  /*
-  GLuint white = create_texture("res/white.png");
-  for(int i = 0; i < 7; i++) { 
-    for(int j = 0; j < 7; j++) {
-      Mesh mesh = {0};
-      mesh.geometry = generate_icosphere_geometry(&arena, 16);
-      mesh.material = (Material){{0.9, 0.15, 0.1}, {0.0, 0.0, 0.0}, ((float)i+1)/7, ((float)j+1)/7, white, white, white, 0, 0};
-      mat4 modelMatrix = GLM_MAT4_IDENTITY_INIT;
-      vec3 translation = {-j*2.2, i*2.2 , 10.0};
-      glm_translate(modelMatrix, translation);
-      glm_mat4_copy(modelMatrix, mesh.modelMatrix);
-      array_set(Mesh, &meshes,(j+7*i) ,mesh);
-    }
-  }
+  //setup
+  setup_environment_map();
+  setup_render(&arena);
+  setup_material(&arena);
+  setup_post_process(windowWidth, windowHeight);
 
-  */
-  //meshes = extract_meshes_from_gltf(&arena, STRING("res/glTF/Helmet/SciFiHelmet.gltf"));//generate_icosphere_geometry(&arena, 32);
-  //const char* skyBoxSources[6] = {"res/skybox/right.jpg", "res/skybox/left.jpg", "res/skybox/top.jpg", "res/skybox/bottom.jpg", "res/skybox/front.jpg", "res/skybox/back.jpg"};
-  //Scene scene = (Scene){meshes, camera, create_cubeMap(skyBoxSources)};
 
-  //skyBox
-  /*
-  //frame buffers
-  unsigned int fbo;
+  // framebuffer setup
   glGenFramebuffers(1, &fbo);
-  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+  glGenRenderbuffers(1, &rbo);
+  glGenTextures(1, &frameTexture);
 
-  unsigned int texture;
-  glGenTextures(1, &texture);
-  glBindTexture(GL_TEXTURE_2D, texture);
-
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1000, 800, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-
+  glBindTexture(GL_TEXTURE_2D, frameTexture);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-
-  unsigned int rbo;
-  glGenRenderbuffers(1, &rbo);
-  glBindRenderbuffer(GL_RENDERBUFFER, rbo); 
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1000, 800);  
-  glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-  assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-  // pbr: setup framebuffer
-  // ----------------------
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-  unsigned int captureFBO;
-  glGenFramebuffers(1, &captureFBO);
-  glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-
-  unsigned int captureRBO;
-  glGenRenderbuffers(1, &captureRBO);
-  glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
-
-  unsigned int prefilterMap;
-  glGenTextures(1, &prefilterMap);
-  glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
-
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // enable pre-filter mipmap sampling (combatting visible dots artifact)
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-  for(unsigned i = 0; i < 6; i++) {
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, NULL);
-  }
-  glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-
-  assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-
-  vec3 origin = {0.0, 0.0, 0.0};
-  vec3 up = {0.0, 1.0, 0.0};
-  vec3 down = {0.0, -1.0, 0.0};
-  vec3 front = {0.0, 0.0, 1.0};
-  vec3 back = {0.0, 0.0, -1.0};
-  vec3 right = {1.0, 0.0, 0.0};
-  vec3 left = {-1.0, 0.0, 0.0};
-
-  mat4 captureViews[6];
-  glm_lookat(origin, right, down, captureViews[0]);
-  glm_lookat(origin, left, down, captureViews[1]);
-  glm_lookat(origin, up, front, captureViews[2]);
-  glm_lookat(origin, down, back, captureViews[3]);
-  glm_lookat(origin, front, down, captureViews[4]);
-  glm_lookat(origin, back, down, captureViews[5]);
-  mat4 projectionMatrix;
-
-  glm_perspective(glm_rad(90.0f), 1.0f, 0.1f, 10.0f, projectionMatrix);
-
-  GLuint envShaderProgram = create_shaders(&arena, "res/shader/skyBoxVertex.glsl", "res/shader/prefilter.glsl");
-  glUseProgram(envShaderProgram);
-
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_CUBE_MAP, scene.skyBox);
-
-  int32_t skyBox = glGetUniformLocation(envShaderProgram, "environmentMap");
-  int32_t roughness = glGetUniformLocation(envShaderProgram, "roughness");
-  int32_t projectionLocation0 = glGetUniformLocation(envShaderProgram, "projection");
-  int32_t viewLocation0 = glGetUniformLocation(envShaderProgram, "view"); 
-
-  if(skyBox != -1) glUniform1i(skyBox, 0);
-  if(projectionLocation0 != -1) glUniformMatrix4fv(projectionLocation0, 1, GL_FALSE, (GLfloat*)projectionMatrix);
-
-  const unsigned maxMipLevels = 5;
-
-  for(unsigned mip = 0; mip < maxMipLevels; ++mip) {
-
-    unsigned int mipWidth  = 128 >> mip;
-    unsigned int mipHeight = 128 >> mip;
-
-    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
-
-    glViewport(0, 0, mipWidth, mipHeight);
-    float roughnessValue = ((float)mip)/((float)(maxMipLevels - 1));
-    if(roughness != -1) glUniform1f(roughness, roughnessValue);
-
-    for(unsigned i = 0; i < 6; i++) {
-      glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
-      if(viewLocation0 != -1) glUniformMatrix4fv(viewLocation0, 1, GL_FALSE, (GLfloat*)captureViews[i]);
-
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      glBindVertexArray(cubeMapVAO);
-      glDrawArrays(GL_TRIANGLES, 0, 36);
-    }
-  }
-
-  GLuint irradiationShader = create_shaders(&arena, "res/shader/skyBoxVertex.glsl", "res/shader/irradiation.glsl");
-  unsigned int irradiationMap;
-  glGenTextures(1, &irradiationMap);
-  glBindTexture(GL_TEXTURE_CUBE_MAP, irradiationMap);
-
-  for(unsigned i = 0; i < 6; i++) {
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, NULL);
-  }
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-  glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-  glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
-
-  glUseProgram(irradiationShader);
-  int32_t skyBox1 = glGetUniformLocation(irradiationShader, "environmentMap");
-  int32_t projectionLocation1 = glGetUniformLocation(irradiationShader, "projection");
-  int32_t viewLocation1 = glGetUniformLocation(irradiationShader, "view"); 
-
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_CUBE_MAP, scene.skyBox);
-
-  if(skyBox1 != -1) glUniform1i(skyBox1, 0);
-  if(projectionLocation1 != -1) glUniformMatrix4fv(projectionLocation1, 1, GL_FALSE, (GLfloat*)projectionMatrix);
-  glViewport(0, 0, 32, 32);
-  for(unsigned i = 0; i < 6; i++) {
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradiationMap, 0);
-    if(viewLocation1 != -1) glUniformMatrix4fv(viewLocation1, 1, GL_FALSE, (GLfloat*)captureViews[i]);
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glBindVertexArray(cubeMapVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-  }
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-
-  GLuint brdfShader = create_shaders(&arena, "res/shader/postProcessVertex.glsl", "res/shader/brdf.glsl");
-  unsigned int brdfLUTTexture;
-  glGenTextures(1, &brdfLUTTexture);
-
-  // pre-allocate enough memory for the LUT texture.
-  glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0);
-  // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_FLOAT, NULL);
 
-  // then re-configure capture framebuffer object and render screen-space quad with BRDF shader.
-  glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-  glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
+  glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, windowWidth, windowHeight);
 
-  glViewport(0, 0, 512, 512);
-  glUseProgram(brdfShader);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  glBindVertexArray(quadVAO);
-  glDrawArrays(GL_TRIANGLES, 0, 6);
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frameTexture, 0);
 
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  glViewport(0, 0, 1000, 800);
-
-  GLuint quadShader = create_shaders(&arena, "res/shader/postProcessVertex.glsl", "res/shader/postProcessFrag.glsl");
-
-  // Loop until the user closes the window
-  */
-
-  //setup_default_meshes();
+  if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "'fbo' is not complete!");
+    fflush(stderr);
+    abort();
+  }
   
-  //skybox setup
-  setup_environment_map();
-  setup_render();
-  setup_material(&arena);
-
+  //scene descriptions
   ShaderProgram skyboxShader = create_shader_program();
   attach_shader_to_program(&arena, &skyboxShader, GL_VERTEX_SHADER, create_string_from_literal("res/shader/skyboxVertex.glsl"));
   attach_shader_to_program(&arena, &skyboxShader, GL_FRAGMENT_SHADER, create_string_from_literal("res/shader/skyboxFragment.glsl"));
@@ -393,6 +185,7 @@ int main(void) {
 
   Material skyBoxMaterial = create_material(&arena, &skyboxShader);
   Texture environmentMap = create_environment_map("res/skybox/right.jpg", "res/skybox/left.jpg", "res/skybox/top.jpg", "res/skybox/bottom.jpg", "res/skybox/front.jpg", "res/skybox/back.jpg");
+  //Texture test = create_texture("res/skybox/right.jpg");
 
   setup_pbr(&arena, environmentMap);
   material_set_texture(&skyBoxMaterial, create_string_from_literal("environmentMap"), environmentMap);
@@ -420,6 +213,17 @@ int main(void) {
   Camera camera = {{0,0,0}, {0, 0, 1}};
 
   Scene scene = (Scene){meshes, camera, skyBoxMaterial};
+  
+  // Post process
+  ShaderProgram bloomShaderProgram = create_shader_program();
+  attach_shader_to_program(&arena, &bloomShaderProgram, GL_COMPUTE_SHADER, create_string_from_literal("res/shader/bloom.glsl"));
+  finalize_shader_program(&bloomShaderProgram);
+  Material bloomMaterial = create_material(&arena, &bloomShaderProgram);
+
+  DynamicArray(Material) postProcessList = create_dynamic_array(Material, 1);
+  dynamic_array_append(Material, &postProcessList, &bloomMaterial);
+
+  /* renders */
 
   double previousTime = 0;
   while (!glfwWindowShouldClose(window)) {
@@ -429,33 +233,11 @@ int main(void) {
 
     input(window, &(scene.camera), dt);
 
-    render_scene(&scene);
-    // updates
-    //double currentTime = glfwGetTime();
-    //float dt = (float)(currentTime - previousTime);
-    //previousTime = currentTime;
-
-    /*
-    input(window, &(scene.camera), dt);
-
-    render the scene
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glEnable(GL_DEPTH_TEST);
-    glClearColor(0.1, 0, 0.21, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    render_scene(&scene, shaderProgram, skyBoxShaderProgram, prefilterMap, brdfLUTTexture, prefilterMap);
-
-    //post processes
+    render_scene(&scene, windowWidth, windowHeight);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
-    glClear(GL_COLOR_BUFFER_BIT);
-    
-    glUseProgram(quadShader);
-    glBindVertexArray(quadVAO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    */
+    Texture outputTexture = post_process(&postProcessList, frameTexture, windowWidth, windowHeight);
+    render_texture(outputTexture);
     
     glfwSwapBuffers(window);
     glfwPollEvents();

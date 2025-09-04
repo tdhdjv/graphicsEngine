@@ -19,8 +19,8 @@ Goal Try to finish 1 per day
 - [x] ambient lighting (specular)
 - [x] code refactoring
 - [x] ambient lighting (diffuse)
-- [ ] make the code more modular and also add some generality?
-- [ ] fully clean up the code
+- [x] make the code more modular and also add some generality?
+- [x] fully clean up the code
 - [ ] post processes
 - [ ] model matrix loading
 - [ ] multiple light

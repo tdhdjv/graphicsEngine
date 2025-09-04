@@ -12,11 +12,15 @@
 #include "material.c"
 #include "scene_define.c"
 #include "environment_map.c"
+#include "shader.c"
 
 static GLuint quadVAO;
+static Material quadMaterial;
+static ShaderProgram quadShader;
+
 static mat4 projectionMatrix;
 
-void setup_render(void) {
+void setup_render(Arena* arena) {
   float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
         // positions   // texCoords
         -1.0f,  1.0f,  0.0f, 1.0f,
@@ -39,8 +43,11 @@ void setup_render(void) {
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
-  //perspective matrix
-  glm_perspective(glm_rad(90.0f), 1000.0f/800.0f, 0.1f, 100.0f, projectionMatrix);
+  quadShader = create_shader_program()
+  attach_shader_to_program(arena, &quadShader, GL_VERTEX_SHADER, create_string_from_literal("res/shader/quadVertex.glsl"));
+  attach_shader_to_program(arena, &quadShader, GL_FRAGMENT_SHADER, create_string_from_literal("res/shader/quadFragment.glsl"));
+  finalize_shader_program(&quadShader);
+  quadMaterial = create_material(arena, &quadShader);
 }
 
 void render_mesh(Mesh* mesh, const Camera* camera, mat4 viewMatrix) {
@@ -54,7 +61,22 @@ void render_mesh(Mesh* mesh, const Camera* camera, mat4 viewMatrix) {
   glDrawElements(GL_TRIANGLES, mesh->renderData.indexCount, GL_UNSIGNED_INT, 0);
 }
 
-void render_scene(Scene* scene) {
+void render_texture(Texture texture) {
+  glUseProgram(quadMaterial.shaderProgram->id);
+  material_set_texture(&quadMaterial, create_string_from_literal("screenTexture"), texture);
+  material_push_uniform_values(&quadMaterial);
+
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glBindVertexArray(quadVAO);
+  glDisable(GL_CULL_FACE);
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+void render_scene(Scene* scene, int windowWidth, int windowHeight) {
+  //perspective matrix
+  glViewport(0, 0, windowWidth, windowHeight);
+  glm_perspective(glm_rad(90.0f), (float)windowWidth/(float)windowHeight, 0.1f, 100.0f, projectionMatrix);
+
   //camera matrices
   mat4 viewMatrix, skyboxViewMatrix;
   vec3 center, facing, position;

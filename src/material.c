@@ -4,6 +4,7 @@
 #include "cglm/mat4.h"
 #include "data_types/arena.c"
 #include "data_types/hashtable.c"
+#include "data_types/string.c"
 #include "scene_define.c"
 #include "shader_type.c"
 #include "opengl_utils.c"
@@ -41,17 +42,24 @@ Material create_material(Arena* arena, const ShaderProgram* shaderProgram) {
       case UNIFORM_TYPE_MAT3:
       case UNIFORM_TYPE_MAT4:
       case UNIFORM_TYPE_INVALID:
+      case UNIFORM_TYPE_IVEC2:
+      case UNIFORM_TYPE_IVEC3:
+      case UNIFORM_TYPE_IVEC4:
+      case UNIFORM_TYPE_UVEC2:
+      case UNIFORM_TYPE_UVEC3:
+      case UNIFORM_TYPE_UVEC4:
         hash_table_set(String, UniformValue, &uniformProperties, name, (UniformValue){0});
         break;
       case UNIFORM_TYPE_SAMPLER1D:
       case UNIFORM_TYPE_SAMPLER2D:
       case UNIFORM_TYPE_SAMPLER3D:
       case UNIFORM_TYPE_SAMPLERCUBE:
+      case UNIFORM_TYPE_IMAGE2D:
         //populate the samplerTable
         samplerValue = (SamplerValue){whiteTexture, sampler++};
         hash_table_set(String, SamplerValue, &samplerProperties, name, samplerValue);
         break;
-    }
+      }
   }
   return (Material){shaderProgram, uniformProperties, samplerProperties};
 }
@@ -120,7 +128,17 @@ void material_push_uniform_values(const Material* material) {
         break;
       case UNIFORM_TYPE_INVALID:
         break;
-    }
+      case UNIFORM_TYPE_IVEC2:
+      case UNIFORM_TYPE_IVEC3:
+      case UNIFORM_TYPE_IVEC4:
+      case UNIFORM_TYPE_UVEC2:
+      case UNIFORM_TYPE_UVEC3:
+      case UNIFORM_TYPE_UVEC4:
+        break;
+      case UNIFORM_TYPE_IMAGE2D:
+        glBindImageTexture(samplerValue.sampler, samplerValue.texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F);
+        break;
+      }
   }
 }
 

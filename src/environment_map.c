@@ -183,8 +183,6 @@ GLuint create_reflection_probe_env_mip_map(uint16_t length, Texture envMap, Mate
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glEnable(GL_CULL_FACE);
-  //change later
-  glViewport(0, 0, 1000, 800);
   return probeMap;
 }
 
@@ -234,8 +232,6 @@ GLuint create_reflection_probe_env(uint16_t length, Texture envMap, Material* ca
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glEnable(GL_CULL_FACE);
-  //change later
-  glViewport(0, 0, 1000, 800);
 
   return probeMap;
 }

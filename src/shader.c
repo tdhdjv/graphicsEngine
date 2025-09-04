@@ -15,11 +15,27 @@ UniformType string_to_uniform_type(String type) {
       return UNIFORM_TYPE_BOOL;
       break;
     case 'i':
-      return UNIFORM_TYPE_INT;
+      switch(type.data[1]) {
+        case 'n':
+         return UNIFORM_TYPE_INT;
+        break;
+        case 'v':
+         return UNIFORM_TYPE_IVEC2 + (type.data[4]-'2');
+        break;
+        case 'm':
+         return UNIFORM_TYPE_IMAGE2D;
+        break;
+      }
       break;
     case 'u':
-      return UNIFORM_TYPE_UNSIGNED_INT;
-      break;
+      switch(type.data[1]) {
+        case 'n':
+         return UNIFORM_TYPE_UNSIGNED_INT;
+        break;
+        case 'v':
+          return UNIFORM_TYPE_UVEC2 + (type.data[4]-'2');
+          break;
+      }
     case 'f':
       return UNIFORM_TYPE_FLOAT;
       break;

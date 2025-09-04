@@ -154,7 +154,7 @@ void main() {
 
   vec3 irradiance = texture(irradianceMap, N).rgb;
   irradiance = irradiance / (vec3(1.01) - irradiance);
-  vec3 diffuse = 0.01 * irradiance * albedo;
+  vec3 diffuse = irradiance * albedo;
 
   // this ambient lighting with environment lighting).
   const float MAX_REFLECTION_LOD = 4.0;
