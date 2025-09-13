@@ -1,2 +1,10 @@
 CompileFlags:
-  Add: [-Wall, -Werror, -I../dependencies/cimgui ,-I../glad/include, -I../dependencies/cglm/include , -I../dependencies/stb_image/include, -I../dependencies/cJSON]
+  Add: [
+    -Wall,
+    -I../dependencies/cimgui,
+    -I../glad/include,
+    -I../dependencies/cglm/include,
+    -I../dependencies/stb_image/include,
+    -I../dependencies/cJSON,
+    -I../dependencies/cgltf
+  ]

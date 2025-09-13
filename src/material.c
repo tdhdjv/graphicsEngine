@@ -14,7 +14,6 @@ Texture whiteTexture;
 void setup_material(Arena* arena) {
   whiteTexture = create_texture("res/white.png");
 }
-
 Material create_material(Arena* arena, const ShaderProgram* shaderProgram) {
   size_t uniformCapacity = 2*shaderProgram->uniforms.length;
   KeyValue(String, UniformValue)* uniformData = arena_alloc_array(arena, KeyValue(String, UniformValue), uniformCapacity);
@@ -30,9 +29,11 @@ Material create_material(Arena* arena, const ShaderProgram* shaderProgram) {
   for(size_t i = 0; i < shaderProgram->uniforms.length; i++) {
     Uniform* uniform = dynamic_array_index(Uniform, &shaderProgram->uniforms, i);
     String name = uniform->name;
+    //depending on the shaderType change the material
     switch(uniform->type) {
       case UNIFORM_TYPE_BOOL:
       case UNIFORM_TYPE_INT:
+      case UNIFORM_TYPE_UNSIGNED_INT:
       case UNIFORM_TYPE_FLOAT:
       case UNIFORM_TYPE_DOUBLE:
       case UNIFORM_TYPE_VEC2:
@@ -54,11 +55,19 @@ Material create_material(Arena* arena, const ShaderProgram* shaderProgram) {
       case UNIFORM_TYPE_SAMPLER2D:
       case UNIFORM_TYPE_SAMPLER3D:
       case UNIFORM_TYPE_SAMPLERCUBE:
-      case UNIFORM_TYPE_IMAGE2D:
         //populate the samplerTable
         samplerValue = (SamplerValue){whiteTexture, sampler++};
         hash_table_set(String, SamplerValue, &samplerProperties, name, samplerValue);
         break;
+      case UNIFORM_TYPE_IMAGE2D:
+        {
+          GLuint location = uniform->location;
+          GLint binding;
+          glGetUniformiv(shaderProgram->id, location, &binding);
+          samplerValue = (SamplerValue){whiteTexture, binding};
+          hash_table_set(String, SamplerValue, &samplerProperties, name, samplerValue);
+          break;
+        }
       }
   }
   return (Material){shaderProgram, uniformProperties, samplerProperties};
@@ -81,6 +90,9 @@ void material_push_uniform_values(const Material* material) {
         break;
       case UNIFORM_TYPE_INT:
         glUniform1i(location, uniformValue.intValue);
+        break;
+      case UNIFORM_TYPE_UNSIGNED_INT:
+        glUniform1i(location, uniformValue.unsignedValue);
         break;
       case UNIFORM_TYPE_FLOAT:
         glUniform1f(location, uniformValue.floatValue);

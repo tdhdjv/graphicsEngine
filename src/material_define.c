@@ -1,6 +1,4 @@
 
-#include "shader.c"
-#include "opengl_utils.c"
 Texture whiteTexture;
 Texture pbrBrdfTexture;
 

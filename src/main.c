@@ -23,6 +23,7 @@
 #include "render.c"
 #include "mesh.c"
 #include "post_process.c"
+#include "gltf_loader.c"
 
 GLFWwindow* window;
 static int windowWidth, windowHeight;
@@ -106,7 +107,7 @@ void init_window(uint16_t width, uint16_t height) {
 
   // Create a windowed mode window and its OpenGL context
   windowWidth = width, windowHeight = height;
-  window = glfwCreateWindow(windowWidth, windowHeight, "Hello World", NULL, NULL); 
+  window = glfwCreateWindow(windowWidth, windowHeight, "My Graphics Engine!", NULL, NULL); 
 
   if (!window) {
     glfwTerminate();
@@ -184,16 +185,19 @@ int main(void) {
   glUseProgram(skyboxShader.id);
 
   Material skyBoxMaterial = create_material(&arena, &skyboxShader);
+  //Texture environmentMap = create_environment_map("res/black.jpg", "res/black.jpg", "res/black.jpg", "res/black.jpg", "res/black.jpg", "res/black.jpg");//
   Texture environmentMap = create_environment_map("res/skybox/right.jpg", "res/skybox/left.jpg", "res/skybox/top.jpg", "res/skybox/bottom.jpg", "res/skybox/front.jpg", "res/skybox/back.jpg");
-  //Texture test = create_texture("res/skybox/right.jpg");
 
   setup_pbr(&arena, environmentMap);
   material_set_texture(&skyBoxMaterial, create_string_from_literal("environmentMap"), environmentMap);
 
-  Mesh* meshArrayData = arena_alloc_array(&arena, Mesh, 64);
-  Array(Mesh) meshes =  create_array(Mesh, meshArrayData, 64);
+  Mesh* meshArrayData = arena_alloc_array(&arena, Mesh, 1);
+  Array(Mesh) meshes =  create_array(Mesh, meshArrayData, 1);
+  *array_index(Mesh, &meshes, 0) = load_gltf(&arena);
+
+  /*
   vec3 albedo = {1.0, 0.0, 0.0};
-  vec3 emissive = {0.0, 0.0, 0.0};
+  vec3 emissive = {10.0, 0.1, 0.1};
 
   //mesh setup
   for(int i = 0; i < 8; i++) { 
@@ -209,20 +213,109 @@ int main(void) {
       *array_index(Mesh, &meshes, i*8 + j) = mesh;
     }
   }
+  */
 
   Camera camera = {{0,0,0}, {0, 0, 1}};
 
   Scene scene = (Scene){meshes, camera, skyBoxMaterial};
   
+  DynamicArray(PostProcess) postProcessList = create_dynamic_array(PostProcess, 2);
+
   // Post process
-  ShaderProgram bloomShaderProgram = create_shader_program();
-  attach_shader_to_program(&arena, &bloomShaderProgram, GL_COMPUTE_SHADER, create_string_from_literal("res/shader/bloom.glsl"));
-  finalize_shader_program(&bloomShaderProgram);
-  Material bloomMaterial = create_material(&arena, &bloomShaderProgram);
+  ShaderProgram downSampleShaderProgram = create_shader_program();
+  attach_shader_to_program(&arena, &downSampleShaderProgram, GL_COMPUTE_SHADER, create_string_from_literal("res/shader/bloom.glsl"));
+  finalize_shader_program(&downSampleShaderProgram);
+  Material downSampleMaterial = create_material(&arena, &downSampleShaderProgram);
 
-  DynamicArray(Material) postProcessList = create_dynamic_array(Material, 1);
-  dynamic_array_append(Material, &postProcessList, &bloomMaterial);
+  PostProcessImage* downSampleImageData = arena_alloc_array(&arena, PostProcessImage, 2); 
+  Array(PostProcessImage) downSampleImages = create_array(PostProcessImage, downSampleImageData, 2);
+  array_index(PostProcessImage, &downSampleImages, 0)->channel = INPUT0;
+  array_index(PostProcessImage, &downSampleImages, 0)->uniformName = create_string_from_literal("inputImage");
+  array_index(PostProcessImage, &downSampleImages, 1)->channel = OUTPUT0;
+  array_index(PostProcessImage, &downSampleImages, 1)->uniformName = create_string_from_literal("outputImage");
+  PostProcess downSample = (PostProcess) {downSampleMaterial, downSampleImages};
 
+  // Post process
+  ShaderProgram upSampleShaderProgram = create_shader_program();
+  attach_shader_to_program(&arena, &upSampleShaderProgram, GL_COMPUTE_SHADER, create_string_from_literal("res/shader/upsample.glsl"));
+  finalize_shader_program(&upSampleShaderProgram);
+  Material upSampleMaterial = create_material(&arena, &upSampleShaderProgram);
+
+  PostProcessImage* upSampleImageData = arena_alloc_array(&arena, PostProcessImage, 2); 
+  Array(PostProcessImage) upSampleImages = create_array(PostProcessImage, upSampleImageData, 2);
+  array_index(PostProcessImage, &upSampleImages, 0)->channel = INPUT0;
+  array_index(PostProcessImage, &upSampleImages, 0)->uniformName = create_string_from_literal("inputImage");
+  array_index(PostProcessImage, &upSampleImages, 1)->channel = OUTPUT0;
+  array_index(PostProcessImage, &upSampleImages, 1)->uniformName = create_string_from_literal("outputImage");
+  PostProcess upSample = (PostProcess) {upSampleMaterial, upSampleImages};
+
+  // Post process
+  ShaderProgram combineShaderProgram = create_shader_program();
+  attach_shader_to_program(&arena, &combineShaderProgram, GL_COMPUTE_SHADER, create_string_from_literal("res/shader/combine.glsl"));
+  finalize_shader_program(&combineShaderProgram);
+  Material combineMaterial = create_material(&arena, &combineShaderProgram);
+
+  PostProcessImage* combineImageData = arena_alloc_array(&arena, PostProcessImage, 3); 
+  Array(PostProcessImage) combineImages = create_array(PostProcessImage, combineImageData, 3);
+  array_index(PostProcessImage, &combineImages, 0)->channel = INPUT0;
+  array_index(PostProcessImage, &combineImages, 0)->uniformName = create_string_from_literal("inputImage");
+  array_index(PostProcessImage, &combineImages, 1)->channel = INPUT1;
+  array_index(PostProcessImage, &combineImages, 1)->uniformName = create_string_from_literal("inputImage2");
+  array_index(PostProcessImage, &combineImages, 2)->channel = OUTPUT0;
+  array_index(PostProcessImage, &combineImages, 2)->uniformName = create_string_from_literal("outputImage");
+  PostProcess combine = (PostProcess) {combineMaterial, combineImages};
+
+  // Post process
+  ShaderProgram splitShaderProgram = create_shader_program();
+  attach_shader_to_program(&arena, &splitShaderProgram, GL_COMPUTE_SHADER, create_string_from_literal("res/shader/split.glsl"));
+  finalize_shader_program(&splitShaderProgram);
+  Material splitMaterial = create_material(&arena, &splitShaderProgram);
+
+  PostProcessImage* splitImageData = arena_alloc_array(&arena, PostProcessImage, 3); 
+  Array(PostProcessImage) splitImages = create_array(PostProcessImage, splitImageData, 3);
+  array_index(PostProcessImage, &splitImages, 0)->channel = INPUT0;
+  array_index(PostProcessImage, &splitImages, 0)->uniformName = create_string_from_literal("inputImage");
+  array_index(PostProcessImage, &splitImages, 1)->channel = OUTPUT0;
+  array_index(PostProcessImage, &splitImages, 1)->uniformName = create_string_from_literal("outputImage");
+  array_index(PostProcessImage, &splitImages, 2)->channel = OUTPUT1;
+  array_index(PostProcessImage, &splitImages, 2)->uniformName = create_string_from_literal("outputImage2");
+  PostProcess split = (PostProcess) {splitMaterial, splitImages};
+
+  ShaderProgram toneMapShaderProgram = create_shader_program();
+  attach_shader_to_program(&arena, &toneMapShaderProgram, GL_COMPUTE_SHADER, create_string_from_literal("res/shader/toneMap.glsl"));
+  finalize_shader_program(&toneMapShaderProgram);
+  Material toneMapMaterial = create_material(&arena, &toneMapShaderProgram);
+
+  PostProcessImage* toneMapImageData = arena_alloc_array(&arena, PostProcessImage, 2); 
+  Array(PostProcessImage) toneMapImages = create_array(PostProcessImage, toneMapImageData, 2);
+  array_index(PostProcessImage, &toneMapImages, 0)->channel = INPUT0;
+  array_index(PostProcessImage, &toneMapImages, 0)->uniformName = create_string_from_literal("inputImage");
+  array_index(PostProcessImage, &toneMapImages, 1)->channel = OUTPUT0;
+  array_index(PostProcessImage, &toneMapImages, 1)->uniformName = create_string_from_literal("outputImage");
+  PostProcess toneMap = (PostProcess) {toneMapMaterial, toneMapImages};
+
+  /*
+
+  dynamic_array_append(PostProcess, &postProcessList, &downSample);
+  dynamic_array_append(PostProcess, &postProcessList, &downSample);
+  dynamic_array_append(PostProcess, &postProcessList, &downSample);
+  dynamic_array_append(PostProcess, &postProcessList, &downSample);
+  dynamic_array_append(PostProcess, &postProcessList, &downSample);
+  dynamic_array_append(PostProcess, &postProcessList, &downSample);
+
+  dynamic_array_append(PostProcess, &postProcessList, &upSample);
+  dynamic_array_append(PostProcess, &postProcessList, &upSample);
+  dynamic_array_append(PostProcess, &postProcessList, &upSample);
+  dynamic_array_append(PostProcess, &postProcessList, &upSample);
+  dynamic_array_append(PostProcess, &postProcessList, &upSample);
+  dynamic_array_append(PostProcess, &postProcessList, &upSample);
+
+
+
+  */
+  dynamic_array_append(PostProcess, &postProcessList, &split);
+  dynamic_array_append(PostProcess, &postProcessList, &combine);
+  dynamic_array_append(PostProcess, &postProcessList, &toneMap);
   /* renders */
 
   double previousTime = 0;

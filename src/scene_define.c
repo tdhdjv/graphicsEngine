@@ -67,11 +67,13 @@ uint64_t hashUniformString(String string) {
 }
 DEFINE_HASH_TABLE(String, UniformValue, hashUniformString, string_equals)
 DEFINE_HASH_TABLE(String, SamplerValue, hashUniformString, string_equals)
+DEFINE_HASH_TABLE(String, bool, hashUniformString, string_equals)
 
 typedef struct {
   const ShaderProgram* shaderProgram;
   HashTable(String, UniformValue) uniformProperties;
   HashTable(String, SamplerValue) samplerProperties;
+  HashTable(String, bool) valueChanged;
 } Material;
 
 // The mesh is contains all the data for rendering geometry and material

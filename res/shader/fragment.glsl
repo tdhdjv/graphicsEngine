@@ -166,12 +166,7 @@ void main() {
   vec3 ambient = kD * diffuse + specular;
   vec3 emissive = texture2D(emissiveMap, TexCoords).rgb * emissiveFactor;
   
-  vec3 color = ambient + Lo + 10.0 * emissive;
-
-  // HDR tonemapping
-  color = color / (color + vec3(1.0));
-  // gamma correct
-  color = pow(color, vec3(1.0/2.2)); 
+  vec3 color = ambient + Lo + emissive;
 
   FragColor = vec4(color, 1.0);
 }

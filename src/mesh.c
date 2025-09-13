@@ -49,20 +49,7 @@ RenderData generate_render_data(Arena* arena, const Geometry* geometry) {
       offset += 2*sizeof(float);
     }
   }
-/*
-  for(size_t i = 0; i < vertexCount; i++) {
-    char* vD = vertexData + (stride * i);
-    printf("pos: %f, %f, %f\n", *(float*)vD, *(float*)(vD+sizeof(float)), *(float*)(vD+2*sizeof(float)));
-    printf("normal: %f, %f, %f\n", *(float*)(vD + 3*sizeof(float)), *(float*)(vD+4*sizeof(float)), *(float*)(vD+5*sizeof(float)));
-    printf("texCoord: %f, %f\n--------------------------\n", *(float*)(vD + 6*sizeof(float)), *(float*)(vD+7*sizeof(float)));
-  }
 
-  for(size_t i = 0; i < indexCount; i++) {
-    printf("indices: %d\n", geometry->indices.data[i]);
-  }
-  fflush(stdout);
-
-  */
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, stride*vertexCount, vertexData,GL_STATIC_DRAW);
 

@@ -21,7 +21,7 @@ Goal Try to finish 1 per day
 - [x] ambient lighting (diffuse)
 - [x] make the code more modular and also add some generality?
 - [x] fully clean up the code
-- [ ] post processes
+- [x] post processes
 - [ ] model matrix loading
 - [ ] multiple light
 - [ ] animations
