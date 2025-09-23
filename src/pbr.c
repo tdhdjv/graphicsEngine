@@ -65,17 +65,18 @@ Material create_pbr_material_values(Arena* arena, vec3 albedo, float roughness, 
 
 Material create_pbr_material_textured(Arena* arena, Texture albedoMap, Texture roughnessMetallicMap, Texture normalMap, Texture emissiveMap) {
   vec3 white_vec = {1.0, 1.0, 1.0};
+  vec3 bright_vec = {10.0, 10.0, 10.0};
   vec3 black_vec = {0.0, 0.0, 0.0};
   Material pbrMaterial = create_material(arena, &pbrShaderProgram);
   material_set_texture(&pbrMaterial, create_string_from_literal("albedoMap"), albedoMap);
-  //material_set_texture(&pbrMaterial, create_string_from_literal("normalMap"), normalMap);
+  material_set_texture(&pbrMaterial, create_string_from_literal("normalMap"), normalMap);
   material_set_texture(&pbrMaterial, create_string_from_literal("roughnessMetallicMap"), roughnessMetallicMap);
   
   material_set_float(&pbrMaterial, create_string_from_literal("metallicFactor"), 1.0);
   material_set_float(&pbrMaterial, create_string_from_literal("roughnessFactor"), 1.0);
   material_set_vec3(&pbrMaterial, create_string_from_literal("albedoFactor"), white_vec);
   if(emissiveMap != 0) {
-    material_set_vec3(&pbrMaterial, create_string_from_literal("emissiveFactor"), white_vec);
+    material_set_vec3(&pbrMaterial, create_string_from_literal("emissiveFactor"), bright_vec);
     material_set_texture(&pbrMaterial, create_string_from_literal("emissiveMap"), emissiveMap);
   } 
   else {

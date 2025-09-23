@@ -11,12 +11,11 @@ uniform mat4 projectionMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 
-void main()
-{
+void main() {
     TexCoords = aTexCoords;
     WorldPos = vec3(modelMatrix * vec4(aPos, 1.0));
     Normal = vec3(modelMatrix * vec4(aNormal, 0.0));
-    
+
     gl_Position =  projectionMatrix * viewMatrix * vec4(WorldPos, 1.0);
 }
 

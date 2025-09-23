@@ -1,6 +1,5 @@
 Rules for better type naming (the type should tell you what it is being used for):
     Always use the string I made!!! (unless it is an external api that uses c strings)
-    expections filenames because it is tedious otherwise
     Use the GLuint
     Use size_t when handling pointers/size (since they are dependent on the machine)
     else use <stdint> type never int, char ... types (expection: char as actually ascii characters)
@@ -22,7 +21,14 @@ Goal Try to finish 1 per day
 - [x] make the code more modular and also add some generality?
 - [x] fully clean up the code
 - [x] post processes
-- [ ] model matrix loading
-- [ ] multiple light
+- [x] optimize post processing
+- [x] improve model loading
+- [x] fix bloom offset
+- [x] multiple light
+- [x] model matrix loading
+- [ ] refactor again
+- [ ] deferred shading
+- [ ] ssao
+- [ ] optimize the binding
+- [ ] batch rendering
 - [ ] animations
-- [ ] improve integers type namings

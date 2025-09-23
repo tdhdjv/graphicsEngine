@@ -148,7 +148,7 @@ void material_push_uniform_values(const Material* material) {
       case UNIFORM_TYPE_UVEC4:
         break;
       case UNIFORM_TYPE_IMAGE2D:
-        glBindImageTexture(samplerValue.sampler, samplerValue.texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F);
+        glBindImageTexture(samplerValue.sampler, samplerValue.texture, samplerValue.level, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F);
         break;
       }
   }
@@ -178,6 +178,15 @@ void material_set_vec3(Material* material, String uniformName, const vec3 vec3Va
   uniformValue->vec3Value[2] = vec3Value[2];
 }
 
+void material_set_vec2(Material* material, String uniformName, const vec2 vec2Value) {
+  if(!hash_table_contains(String, UniformValue, &material->uniformProperties, uniformName)) {
+    fprintf(stderr, "Shader %d There is not uniform called %.*s\n", material->shaderProgram->id, (int)uniformName.len, uniformName.data);
+    fflush(stderr);
+  }
+  UniformValue* uniformValue = hash_table_index(String, UniformValue, &material->uniformProperties, uniformName);
+  uniformValue->vec2Value[0] = vec2Value[0];
+  uniformValue->vec2Value[1] = vec2Value[1];
+}
 void material_set_float(Material* material, String uniformName, float floatValue) {
   if(!hash_table_contains(String, UniformValue, &material->uniformProperties, uniformName)) {
     fprintf(stderr, "Shader %d There is not uniform called %.*s\n", material->shaderProgram->id, (int)uniformName.len, uniformName.data);
@@ -205,4 +214,13 @@ void material_set_texture(Material* material, String uniformName, Texture textur
   samplerValue->texture = texture;
 }
 
+void material_set_image(Material* material, String uniformName, Texture texture, GLuint level) {
+  if(!hash_table_contains(String, SamplerValue, &material->samplerProperties, uniformName)) {
+    fprintf(stderr, "Shader %d There is not uniform called %.*s\n", material->shaderProgram->id, (int)uniformName.len, uniformName.data);
+    fflush(stderr);
+  }
+  SamplerValue* samplerValue = hash_table_index(String, SamplerValue, &material->samplerProperties, uniformName);
+  samplerValue->texture = texture;
+  samplerValue->level = level;
+}
 #endif

@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 
+#include "data_types/array.c"
 #include "data_types/string.c"
 #include "material.c"
 #include "scene_define.c"
@@ -50,12 +51,37 @@ void setup_render(Arena* arena) {
   quadMaterial = create_material(arena, &quadShader);
 }
 
-void render_mesh(Mesh* mesh, const Camera* camera, mat4 viewMatrix) {
+void render_mesh(Mesh* mesh, const Camera* camera, mat4 viewMatrix, DynamicArray(DirectionalLight) directionalLights, DynamicArray(OmniDirectionalLight) omniDirectionalLights) {
   glUseProgram(mesh->material.shaderProgram->id);
   material_set_vec3(&mesh->material, create_string_from_literal("camPos"), camera->position);
   material_set_mat4(&mesh->material, create_string_from_literal("viewMatrix"), viewMatrix);
   material_set_mat4(&mesh->material, create_string_from_literal("projectionMatrix"), projectionMatrix);
   material_set_mat4(&mesh->material, create_string_from_literal("modelMatrix"), mesh->modelMatrix);
+
+  //lighting and shit
+  char uniformName[256];
+
+  for(size_t i = 0; i < directionalLights.length; i++) {
+    DirectionalLight* directionalLight = dynamic_array_index(DirectionalLight, &directionalLights, i);
+    snprintf(uniformName, 255, "directionalLights[%zu].direction", i);
+    int location = glGetUniformLocation(mesh->material.shaderProgram->id, uniformName);
+    glUniform3f(location, directionalLight->direction[0], directionalLight->direction[1],directionalLight->direction[2]);
+    snprintf(uniformName, 255, "directionalLights[%zu].color", i);
+    location = glGetUniformLocation(mesh->material.shaderProgram->id, uniformName);
+    glUniform3f(location, directionalLight->color[0], directionalLight->color[1],directionalLight->color[2]);
+    fflush(stdout);
+  }
+
+  for(size_t i = 0; i < omniDirectionalLights.length; i++) {
+    OmniDirectionalLight* omniDirectionalLight = dynamic_array_index(OmniDirectionalLight, &omniDirectionalLights, i);
+    snprintf(uniformName, 255, "omniDirectionalLights[%zu].position", i);
+    int location = glGetUniformLocation(mesh->material.shaderProgram->id, uniformName);
+    glUniform3f(location, omniDirectionalLight->position[0], omniDirectionalLight->position[1],omniDirectionalLight->position[2]);
+    snprintf(uniformName, 255, "omniDirectionalLights[%zu].color", i);
+    location = glGetUniformLocation(mesh->material.shaderProgram->id, uniformName);
+    glUniform3f(location, omniDirectionalLight->color[0], omniDirectionalLight->color[1],omniDirectionalLight->color[2]);
+  }
+
   material_push_uniform_values(&mesh->material);
   glBindVertexArray(mesh->renderData.vao);
   glDrawElements(GL_TRIANGLES, mesh->renderData.indexCount, GL_UNSIGNED_INT, 0);
@@ -111,7 +137,7 @@ void render_scene(Scene* scene, int windowWidth, int windowHeight) {
 
   //render meshes
   for(size_t i = 0; i < scene->meshList.length; i++) {
-    render_mesh(&scene->meshList.data[i], &scene->camera, viewMatrix);
+    render_mesh(&scene->meshList.data[i], &scene->camera, viewMatrix, scene->directionalLights, scene->omniDirectionalLights);
   }
 }
 

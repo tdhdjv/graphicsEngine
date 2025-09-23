@@ -53,6 +53,7 @@ typedef union {
 typedef struct {
   Texture texture;
   Sampler sampler;
+  GLuint level;
 } SamplerValue;
 
 uint64_t hashUniformString(String string) {
@@ -86,9 +87,33 @@ typedef struct {
 
 DEFINE_ARRAY(Mesh)
 
+typedef struct {
+  vec3 direction;
+  vec3 color;
+} DirectionalLight;
+
+typedef struct {
+  vec3 position;
+  vec3 color;
+} OmniDirectionalLight;
+
+typedef struct {
+  vec3 position;
+  vec3 direction;
+  float cutoff;
+  vec3 color;
+} SpotLight;
+
+DEFINE_DYNAMIC_ARRAY(DirectionalLight)
+DEFINE_DYNAMIC_ARRAY(OmniDirectionalLight)
+DEFINE_DYNAMIC_ARRAY(SpotLight)
+
 //Scene refers to a whole which can be seen
 typedef struct {
   Array(Mesh) meshList;
+  DynamicArray(DirectionalLight) directionalLights;
+  DynamicArray(OmniDirectionalLight) omniDirectionalLights;
+  DynamicArray(SpotLight) spotLights;
   Camera camera;
   Material skyBoxMaterial;
 } Scene;
