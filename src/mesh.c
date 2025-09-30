@@ -9,52 +9,58 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "data_types/array.c"
 #include "data_types/arena.c"
+#include "data_types/scratch.c"
 #include "scene_define.c"
 
-RenderData generate_render_data(Arena* arena, const Geometry* geometry) {
+Mesh mesh_generate_from_geometry(const Geometry* geometry) {
   //We assume that the position data is always present
-  uint32_t vertexCount = geometry->positions.length;
-  size_t indexCount = geometry->indices.length;
+  uint32_t vertexCount = geometry->vertexCount;
+  size_t indexCount = geometry->indexCount;
 
   uint16_t stride = 3*sizeof(float);
-  bool hasNormals = geometry->normals.length != 0;
-  bool hasTexCoord = geometry->textureCoordinates.length != 0;
+  bool hasNormals = geometry->normals != NULL;
+  bool hasTangent = geometry->tangents != NULL;
+  bool hasTexCoord = geometry->texCoords != NULL;
 
   if(hasNormals) stride += 3*sizeof(float);
+  if(hasTangent) stride += 3*sizeof(float);
   if(hasTexCoord) stride += 2*sizeof(float);
 
-  GLuint VBO, VAO, EBO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-  glGenBuffers(1, &EBO);
+  GLuint vbo, vao, ebo;
+  glGenVertexArrays(1, &vao);
+  glGenBuffers(1, &vbo);
+  glGenBuffers(1, &ebo);
   // bind the Vertex Array Object first, then bind and set vertex buffer(s), and
   // then configure vertex attributes(s).
-  glBindVertexArray(VAO);
+  glBindVertexArray(vao);
 
-  ScratchArena scratch = create_scratch_arena(arena);
-  char* vertexData = arena_alloc(arena, vertexCount*stride);
+  with_scratch(scratch, {
+  char* vertexData = arena_alloc(scratch, vertexCount*stride);
 
   size_t offset = 0;
   for(size_t i = 0; i < vertexCount; i++) {
-    memcpy(vertexData + offset, geometry->positions.data + i, 3*sizeof(float));
+    memcpy(vertexData + offset, geometry->positions + i, 3*sizeof(float));
     offset += 3*sizeof(float);
     if(hasNormals) {
-      memcpy(vertexData + offset, geometry->normals.data + i, 3*sizeof(float));
+      memcpy(vertexData + offset, geometry->normals + i, 3*sizeof(float));
+      offset += 3*sizeof(float);
+    }
+    if(hasTangent) {
+      memcpy(vertexData + offset, geometry->tangents + i, 3*sizeof(float));
       offset += 3*sizeof(float);
     }
     if(hasTexCoord) {
-      memcpy(vertexData + offset, geometry->textureCoordinates.data + i, 2*sizeof(float));
+      memcpy(vertexData + offset, geometry->texCoords + i, 2*sizeof(float));
       offset += 2*sizeof(float);
     }
   }
 
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, stride*vertexCount, vertexData,GL_STATIC_DRAW);
 
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * indexCount,geometry->indices.data, GL_STATIC_DRAW);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * indexCount,geometry->indices, GL_STATIC_DRAW);
 
   offset = 0;
 
@@ -67,18 +73,33 @@ RenderData generate_render_data(Arena* arena, const Geometry* geometry) {
     glEnableVertexAttribArray(1);
     offset += 3*sizeof(float);
   }
-
-  if(hasTexCoord) {
-    glVertexAttribPointer(2,2, GL_FLOAT, GL_FALSE, stride, (void *)offset);
+  if(hasTangent) {
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void *)offset);
     glEnableVertexAttribArray(2);
+    offset += 3*sizeof(float);
+  }
+  if(hasTexCoord) {
+    glVertexAttribPointer(3,2, GL_FLOAT, GL_FALSE, stride, (void *)offset);
+    glEnableVertexAttribArray(3);
     offset += 2*sizeof(float);
   }
+  })
+  Mesh mesh;
+  mesh.vao = vao;
+  mesh.vbo = vbo;
+  mesh.ebo = ebo;
+  mesh.boxMin[0] = geometry->boxMin[0];
+  mesh.boxMin[1] = geometry->boxMin[1];
+  mesh.boxMin[2] = geometry->boxMin[2];
 
-  release_scratch_arena(scratch);
+  mesh.boxMax[0] = geometry->boxMax[0]; 
+  mesh.boxMax[1] = geometry->boxMax[1]; 
+  mesh.boxMax[2] = geometry->boxMax[2]; 
 
-  return (RenderData){VAO, VBO, EBO ,indexCount};
+  return mesh;
 }
 
+/*
 RenderData generate_quad(Arena* arena, vec3 horizontal, vec3 vertical, uint32_t subDivision) {
   size_t vertexCount = (subDivision + 2) * (subDivision + 2);
   size_t indexCount = 6 * (subDivision + 1) * (subDivision + 1);

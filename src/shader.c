@@ -1,13 +1,12 @@
 #ifndef SHADER_IMPL
 #define SHADER_IMPL
 
-#include "shader_type.c"
 #include "data_types/arena.c"
 #include "data_types/string.c"
-#include "data_types/io.c"
 
 #define create_shader_program(void) (ShaderProgram){glCreateProgram(), create_dynamic_array(Uniform, 16)};
 
+/*
 UniformType string_to_uniform_type(String type) {
   //This function assumes that the 'type' is valid!!!
   switch(type.data[0]) {
@@ -58,13 +57,15 @@ UniformType string_to_uniform_type(String type) {
   }
   return UNIFORM_TYPE_INVALID;
 }
+*/
 
-void attach_shader_to_program(Arena* arena, ShaderProgram* shaderProgram, GLenum shaderType, String filePath) {
+void attach_shader_to_program(Arena* arena, Shader* shaderProgram, GLenum shaderType, String filePath) {
   int success;
   char infoLog[512];
 
   GLuint shader = glCreateShader(shaderType);
   String shaderSource = read_file(arena, filePath);
+  /*
   const String strUniform = create_string_from_literal("uniform");
   const String strDoubleSlash = create_string_from_literal("//");
   //File Parsing
@@ -89,7 +90,8 @@ void attach_shader_to_program(Arena* arena, ShaderProgram* shaderProgram, GLenum
     Uniform uniform = (Uniform){string_to_uniform_type(type), name, 0};
     dynamic_array_append(Uniform, &shaderProgram->uniforms, &uniform);
   }
-  
+  */
+
   //Compliation and stuff
   char cShaderSource[shaderSource.len+1];
   string_to_c_str(shaderSource, cShaderSource);

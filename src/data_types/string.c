@@ -1,152 +1,231 @@
 #ifndef STRING_IMPL
 #define STRING_IMPL
 
-#include <malloc.h>
-#include <stddef.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
+#include "define.c"
+#include "data_type_define.c"
 
-typedef struct DynamicString DynamicString;
-typedef struct String String;
+#ifdef STRING_NO_ERROR
+  #define STRING_ASSERT(message, ...)
+#else
+  #define STRING_ASSERT(message, ...)\
+    fprintf(stderr, message, ##__VA_ARGS__);\
+    fflush(stderr);\
+    abort();
+#endif
 
-struct DynamicString{
-  char* data;
-  size_t len;
-  size_t capacity;
-};
+//specific operations of strings only
+#define str(cString) (charArray){cString, sizeof(cString)-1}
+#define dyn_str(cString) (charArray){cString, sizeof(cString)-1}
 
-struct String{
-  const char* data;
-  size_t len;
-};
+void c_str(char* dst, charArray string) {
+  memcpy(dst, string.data, string.length);
+  dst[string.length] = '\0';
+}
 
-DynamicString create_dynamic_string(const char* stringData, size_t capacity) {
-  char* data = malloc(capacity);
-  size_t stringLen = strlen(stringData);
-  
-  if(!data) {
-    fprintf(stderr, "Failed to allocate memory");
+void dyn_c_str(char* dst, charDynamicArray string) {
+  memcpy(dst, string.data, string.length);
+  dst[string.length] = '\0';
+}
+
+#define DEFINE_STR_TO_INT(type) \
+i##type str_to_i##type (const Array(char) string) {\
+  i##type value = 0;\
+  i##type previousValue = 0;\
+  i##type sign = 1;\
+\
+  if(string.length == 0) {\
+    STRING_ASSERT("The string '' is can not be converted to i%d", type)\
+  }\
+\
+  size_t i = 0;\
+  if(string.data[i] == '-') {\
+    sign = -1;\
+    i++;\
+  }\
+\
+  for(; i < string.length; i++) {\
+    switch(string.data[i]) {\
+      case '0':\
+      case '1':\
+      case '2':\
+      case '3':\
+      case '4':\
+      case '5':\
+      case '6':\
+      case '7':\
+      case '8':\
+      case '9':\
+        value *= 10;\
+        value += string.data[i] - '0';\
+        if(value < previousValue) {\
+          if(sign > 0) {\
+            STRING_ASSERT("Integer Overflow: \nThe value of string %.*s is bigger than the max value of i%d", (i32)string.length, string.data, type)\
+          }\
+          else {\
+            STRING_ASSERT("Integer Underflow: \nThe value of string %.*s is smaller than the min value of i%d", (i32)string.length, string.data, type)\
+          }\
+        }\
+        previousValue = value;\
+      break;\
+      default:\
+        STRING_ASSERT("Invalid char detected at: %zu\nThe string %.*s is can not be converted to i%d", i, (i32)string.length, string.data, type)\
+      break;\
+    } \
+  }\
+\
+  if(i == 1 && sign == -1) {\
+    STRING_ASSERT("The string '-' can not be converted to i%d", type)\
+  }\
+  return value * sign;\
+}\
+\
+i##type dynamic_str_to_i##type (const DynamicArray(char) string) {\
+  i##type value = 0;\
+  i##type sign = 1;\
+\
+  if(string.length == 0) {\
+    STRING_ASSERT("The string '' is can not be converted to i%d", type)\
+  }\
+\
+  size_t i = 0;\
+  if(string.data[i] == '-') {\
+    sign = -1;\
+    i++;\
+  }\
+\
+  for(; i < string.length; i++) {\
+    switch(string.data[i]) {\
+      case '0':\
+      case '1':\
+      case '2':\
+      case '3':\
+      case '4':\
+      case '5':\
+      case '6':\
+      case '7':\
+      case '8':\
+      case '9':\
+        if(value > value*10) {\
+          STRING_ASSERT("Integer Overflow: \nThe value of string %.*s is bigger than the max value of i%d", (i32)string.length, string.data, type)\
+        }\
+        value *= 10;\
+        value += string.data[i] - '0';\
+      break;\
+      default:\
+        STRING_ASSERT("Invalid char detected at: %zu\nThe string %.*s is can not be converted to i%d", i, (i32)string.length, string.data, type)\
+      break;\
+    } \
+  }\
+\
+  if(i == 1 && sign == -1) {\
+    STRING_ASSERT("The string '-' can not be converted to i%d", type)\
+  }\
+  return value * sign;\
+}
+
+#define DEFINE_STR_TO_UNSIGNED_INT(type) \
+\
+u##type str_to_u##type (const Array(char) string) {\
+  u##type value = 0;\
+\
+  if(string.length == 0) {\
+    STRING_ASSERT("The string '' can not be converted to u%d", type)\
+  }\
+\
+  size_t i = 0;\
+  if(string.data[i] == '-') {\
+    STRING_ASSERT("Invalid Value:\n The value can't be negative \n The string %.*s can not be converted to u%d", (i32)string.length, string.data, type)\
+  }\
+\
+  for(; i < string.length; i++) {\
+    switch(string.data[i]) {\
+      case '0':\
+      case '1':\
+      case '2':\
+      case '3':\
+      case '4':\
+      case '5':\
+      case '6':\
+      case '7':\
+      case '8':\
+      case '9':\
+        if(value > value*10) {\
+          STRING_ASSERT("Integer Overflow: \nThe value of string %.*s is bigger than the max value of i%d", (i32)string.length, string.data, type)\
+        }\
+        value *= 10;\
+        value += string.data[i] - '0';\
+      break;\
+      default:\
+        STRING_ASSERT("Invalid char detected at: %zu\nThe string %.*s is can not be converted to u%d", i, (i32)string.length, string.data, type)\
+      break;\
+    } \
+  }\
+\
+  return value;\
+}\
+\
+u##type dynamic_str_to_u##type (const DynamicArray(char) string) {\
+  u##type value = 0;\
+\
+  if(string.length == 0) {\
+    STRING_ASSERT( "The string '' can not be converted to u%d", type)\
+  }\
+\
+  size_t i = 0;\
+  if(string.data[i] == '-') {\
+    STRING_ASSERT( "Invalid Value:\n The value can't be negative \n The string %.*s can not be converted to u%d", (i32)string.length, string.data, type)\
+  }\
+\
+  for(; i < string.length; i++) {\
+    switch(string.data[i]) {\
+      case '0':\
+      case '1':\
+      case '2':\
+      case '3':\
+      case '4':\
+      case '5':\
+      case '6':\
+      case '7':\
+      case '8':\
+      case '9':\
+        if(value > value*10) {\
+          STRING_ASSERT( "Value Overflow: \nThe value of string %.*s is bigger than the max value of i%d", (i32)string.length, string.data, type)\
+          fflush(stderr);\
+          abort();\
+        }\
+        value *= 10;\
+        value += string.data[i] - '0';\
+      break;\
+      default:\
+        STRING_ASSERT( "Invalid char detected at: %zu\nThe string %.*s is can not be converted to u%d", i, (i32)string.length, string.data, type)\
+        fflush(stderr);\
+        abort();\
+      break;\
+    } \
+  }\
+\
+  return value;\
+}
+
+float str_to_float(const Array(char) string) {
+  float value = 0.0;
+  float sign = 1.0;
+  float exp = 0.0;
+
+  if(string.length == 0) {
+    STRING_ASSERT( "The string '' is can not be converted to float");
     fflush(stderr);
     abort();
   }
-  if(stringLen > capacity) {
-    fprintf(stderr, "The length of String is longer than the capacity");
-    fflush(stderr);
-    abort();
+
+  size_t i = 0;
+  if(string.data[i] == '-') {
+    sign = -1;
+    i++;
   }
 
-  memcpy(data, stringData, stringLen);
-  return (DynamicString){data, stringLen, capacity};
-}
-
-void dynamic_string_grow(DynamicString* dynamicString, size_t amount) {
-  size_t newCapacity = dynamicString->capacity + amount;
-  char* newData =  realloc(dynamicString->data, newCapacity);
-  if(!newData) {
-    fprintf(stderr, "Failed to allocate memory");
-    fflush(stderr);
-    abort();
-  }
-  dynamicString->capacity = newCapacity;
-  dynamicString->data = newData;
-}
-
-void dynamic_string_append_cstr(DynamicString* dynamicString, const char* string) {
-  size_t stringLen = strlen(string);
-  while(dynamicString->len + stringLen > dynamicString->capacity) {
-    //grow by 1.5 times
-    dynamic_string_grow(dynamicString, dynamicString->capacity/2+1);
-  }
-  memcpy(dynamicString->data + dynamicString->len, string, stringLen);
-  dynamicString->len += stringLen;
-}
-
-void dynamic_string_append_string(DynamicString* dynamicString, String string) {
-  size_t stringLen = string.len;
-  while(dynamicString->len + stringLen > dynamicString->capacity) {
-    //grow by 1.5 times
-    dynamic_string_grow(dynamicString, dynamicString->capacity/2+1);
-  }
-  memcpy(dynamicString->data + dynamicString->len, string.data, stringLen);
-  dynamicString->len += stringLen;
-}
-
-/* This function assumes 2 things
- * 1. that the char* has enough memory allocated!!!
- * 2. that the char* doesn't overlap with the dynamicString->data
-*/
-void dynamic_string_to_c_str(const DynamicString* dynamicString, char* result) {
-  memcpy(result, dynamicString->data, dynamicString->len);
-  result[dynamicString->len] = '\0';
-};
-
-// String slices / String that are just used for data perposes
-#define create_string_from_literal(s) (String){ .data=s, .len=sizeof(s)-1 }
-
-/* This function assumes 2 things
- * 1. that the char* has enough memory allocated!!!
- * 2. that the char* doesn't overlap with the dynamicString->data
-*/
-void string_to_c_str(String string, char* result) {
-  memcpy(result, string.data, string.len);
-  result[string.len] = '\0';
-}
-
-bool string_equals(String a, String b) {
-  return a.len == b.len && (!a.len || ((*a.data == *b.data) && !memcmp(a.data, b.data, a.len)));
-}
-
-String string_span(const char* beg, const char* end) {
-  String s = {0};
-  s.data = beg;
-  s.len = beg ? (end==beg ? 0:end-beg) : 0;
-  return s;
-}
-
-//returns the value in which the string was found return -1 when not found
-int32_t string_find_substring(const String parent, const String child) {
-  if(child.len > parent.len) return -1;
-  for(size_t i = 0; i < parent.len-child.len+1; i++) {
-    if(string_equals(child, string_span(parent.data+i, parent.data+i+child.len))) return i;
-  }
-  return -1;
-}
-
-int32_t string_find(String string, const char c) {
-  for(size_t i = 0; i < string.len; i++) {
-    if(string.data[i] == c) return i;
-  }
-  return -1;
-}
-
-int32_t string_find_reverse(String string, const char c) {
-  for(size_t i = string.len-1; i >= 0; i--) {
-    if(string.data[i] == c) return i;
-  }
-  return -1;
-}
-//Trim the part of the string that contains a char in removals
-String string_trim_left(String string, String removals) {
-  for (; string.len && string_find(removals, *string.data) != -1; string.data++, string.len--);
-  return string;
-}
-
-//Trim the part of the string that contains a char in removals
-String string_trim_right(String string, String removals) {
-  for (; string.len && string_find(removals, string.data[string.len-1]) != -1; string.len--);
-  return string;
-}
-
-int8_t string_to_int8(const String string) {
-  int8_t value = 0;
-  char sign = 1;
-  for(size_t i = 0; i < string.len; i++) {
-    if(value < 0) goto error;
+  for(; i < string.length; i++) {
     switch(string.data[i]) {
-      case '+': break;
-      case '-': sign = -1; break;
       case '0':
       case '1':
       case '2':
@@ -157,202 +236,97 @@ int8_t string_to_int8(const String string) {
       case '7':
       case '8':
       case '9':
-        value = 10*value + string.data[i] - '0'; 
+        value *= 10.0;
+        value += (float)(string.data[i] - '0');
+        exp *= 0.1;
         break;
+      case '.':
+        exp = 1.0;
+      break;
+      case 'f':
+      break;
       default:
-        goto error;
-        break;
-    }
-  }
-  return sign*value;
-
-  error:
-    #ifdef STRING_ERROR 
-    fprintf(stderr, "An Invalid value was given to be parsed into an int");
-    fflush(stderr);
-    abort();
-    #else
-    return 0;
-    #endif
-}
-
-int16_t string_to_int16(const String string) {
-  int16_t value = 0;
-  char sign = 1;
-  for(size_t i = 0; i < string.len; i++) {
-    switch(string.data[i]) {
-      case '+': break;
-      case '-': sign = -1; break;
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-        value = 10*value + string.data[i] - '0'; 
-        break;
-      default:
-        goto error;
-        break;
-    }
-  }
-  return sign*value;
-
-  error:
-    #ifdef STRING_ERROR 
-    fprintf(stderr, "An Invalid value was given to be parsed into an int");
-    fflush(stderr);
-    abort();
-    #else
-    return 0;
-    #endif
-}
-
-int32_t string_to_int32(const String string) {
-  int32_t value = 0;
-  char sign = 1;
-  for(size_t i = 0; i < string.len; i++) {
-    switch(string.data[i]) {
-      case '+': break;
-      case '-': sign = -1; break;
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-        value = 10*value + string.data[i] - '0'; 
-        break;
-      default:
-        goto error;
-        break;
-    }
-  }
-  return sign*value;
-
-  error:
-    #ifdef STRING_ERROR 
-    fprintf(stderr, "An Invalid value was given to be parsed into an int");
-    fflush(stderr);
-    abort();
-    #else
-    return 0;
-    #endif
-}
-
-int64_t string_to_int64(const String string) {
-  int64_t value = 0;
-  char sign = 1;
-  for(size_t i = 0; i < string.len; i++) {
-    switch(string.data[i]) {
-      case '+': break;
-      case '-': sign = -1; break;
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-        value = 10*value + string.data[i] - '0'; 
-        break;
-      default:
-        goto error;
-        break;
-    }
-  }
-  return sign*value;
-
-  error:
-    #ifdef STRING_ERROR 
-    fprintf(stderr, "An Invalid value was given to be parsed into an int");
-    fflush(stderr);
-    abort();
-    #else
-    return 0;
-    #endif
-}
-
-
-static float exp10i(const int32_t exp) {
-    float y = 1.0f;
-    float x = exp<0 ? 0.1f : exp>0 ? 10.0f : 1.0f;
-    int32_t n = exp<0 ? exp : -exp;
-    for (; n < -1; n /= 2) {
-        y *= n%2 ? x : 1.0f;
-        x *= x;
-    }
-    return x * y;
-}
-
-float string_to_float(const String string) {
-  float value = 0.0f;
-  float sign = 1.0f;
-  float exp = 0.0f;
-  for(size_t i = 0; i < string.len; i++) {
-    switch(string.data[i]) {
-      case '+': break;
-      case '-': sign = -1; break;
-      case '.': exp = 1; break;
-      case 'E':
-      case 'e': 
-        exp = exp ? exp : 1.0f;
-        exp *= exp10i(string_to_int8(string_span(string.data+i+1, string.data + string.len)));
-        i = string.len;
-        break;
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-        value = 10.0f*value + (float)(string.data[i] - '0');
-        exp *= 0.1f;
-        break;
-      default:
-        #ifdef STRING_ERROR 
-        fprintf(stderr, "An Invalid value was given to be parsed into an int");
+        STRING_ASSERT( "Invalid char detected at: %zu\nThe string %.*s is can not be converted to float", i, (i32)string.length, string.data);
         fflush(stderr);
         abort();
-        #else
-        return 0;
-        #endif
-        break;
-    }
+      break;
+    } 
   }
-  return sign * value * (exp ? exp : 1.0f);
+
+  if(i == 1 && sign == -1) {
+    STRING_ASSERT( "The string '-' can not be converted to float");
+    fflush(stderr);
+    abort();
+  }
+  exp = exp == 0.0 ? 1.0 : exp;
+  return value * sign * exp;
 }
 
-typedef struct {
-  String head;
-  String tail;
-  bool found;
-} Cut;
+float dynamic_str_to_float(const DynamicArray(char) string) {
+  float value = 0.0;
+  float sign = 0.0;
+  float exp = 0.0;
 
-//Cuts a String into 2 down a first instance of a char c
-Cut string_cut(String string, const char c) {
-  if(string.len == 0) return (Cut){0};
-  const char* begin = string.data;
-  const char* end = begin + string.len;
-  const char* cutPtr = begin;
-  for(; cutPtr<end && *cutPtr!=c; cutPtr++);
-  Cut cut = (Cut){ .found=cutPtr<end, .head=string_span(begin, cutPtr), .tail=string_span(cutPtr+(cutPtr<end), end)};
-  return cut;
+  if(string.length == 0) {
+    STRING_ASSERT( "The string '' is can not be converted to float");
+    fflush(stderr);
+    abort();
+  }
+
+  size_t i = 0;
+  if(string.data[i] == '-') {
+    sign = -1;
+    i++;
+  }
+
+  for(; i < string.length; i++) {
+    switch(string.data[i]) {
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':
+        value *= 10.0;
+        value += (float)(string.data[i] - '0');
+        exp *= 0.1;
+        break;
+      case '.':
+        exp = 1.0;
+      break;
+      case 'f':
+      break;
+      default:
+        STRING_ASSERT( "Invalid char detected at: %zu\nThe string %.*s is can not be converted to float", i, (i32)string.length, string.data);
+        fflush(stderr);
+        abort();
+      break;
+    } 
+  }
+
+  if(i == 1 && sign == -1) {
+    STRING_ASSERT( "The string '-' can not be converted to float");
+    fflush(stderr);
+    abort();
+  }
+  exp = exp == 0.0 ? 1.0 : exp;
+  return value * sign * exp;
 }
+
+DEFINE_STR_TO_INT(8)
+DEFINE_STR_TO_INT(16)
+DEFINE_STR_TO_INT(32)
+DEFINE_STR_TO_INT(64)
+
+DEFINE_STR_TO_UNSIGNED_INT(8)
+DEFINE_STR_TO_UNSIGNED_INT(16)
+DEFINE_STR_TO_UNSIGNED_INT(32)
+DEFINE_STR_TO_UNSIGNED_INT(64)
 
 #endif
+
+

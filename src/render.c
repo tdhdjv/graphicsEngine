@@ -10,9 +10,7 @@
 
 #include "data_types/array.c"
 #include "data_types/string.c"
-#include "material.c"
 #include "scene_define.c"
-#include "environment_map.c"
 #include "shader.c"
 
 static GLuint quadVAO;
@@ -20,125 +18,12 @@ static Material quadMaterial;
 static ShaderProgram quadShader;
 
 static mat4 projectionMatrix;
-
-void setup_render(Arena* arena) {
-  float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
-        // positions   // texCoords
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-  };
-
-  unsigned quadVBO;
-  glGenVertexArrays(1, &quadVAO);
-  glGenBuffers(1, &quadVBO);
-  glBindVertexArray(quadVAO);
-  glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-  glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-  glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-
-  quadShader = create_shader_program()
-  attach_shader_to_program(arena, &quadShader, GL_VERTEX_SHADER, create_string_from_literal("res/shader/quadVertex.glsl"));
-  attach_shader_to_program(arena, &quadShader, GL_FRAGMENT_SHADER, create_string_from_literal("res/shader/quadFragment.glsl"));
-  finalize_shader_program(&quadShader);
-  quadMaterial = create_material(arena, &quadShader);
-}
-
-void render_mesh(Mesh* mesh, const Camera* camera, mat4 viewMatrix, DynamicArray(DirectionalLight) directionalLights, DynamicArray(OmniDirectionalLight) omniDirectionalLights) {
-  glUseProgram(mesh->material.shaderProgram->id);
-  material_set_vec3(&mesh->material, create_string_from_literal("camPos"), camera->position);
-  material_set_mat4(&mesh->material, create_string_from_literal("viewMatrix"), viewMatrix);
-  material_set_mat4(&mesh->material, create_string_from_literal("projectionMatrix"), projectionMatrix);
-  material_set_mat4(&mesh->material, create_string_from_literal("modelMatrix"), mesh->modelMatrix);
-
-  //lighting and shit
-  char uniformName[256];
-
-  for(size_t i = 0; i < directionalLights.length; i++) {
-    DirectionalLight* directionalLight = dynamic_array_index(DirectionalLight, &directionalLights, i);
-    snprintf(uniformName, 255, "directionalLights[%zu].direction", i);
-    int location = glGetUniformLocation(mesh->material.shaderProgram->id, uniformName);
-    glUniform3f(location, directionalLight->direction[0], directionalLight->direction[1],directionalLight->direction[2]);
-    snprintf(uniformName, 255, "directionalLights[%zu].color", i);
-    location = glGetUniformLocation(mesh->material.shaderProgram->id, uniformName);
-    glUniform3f(location, directionalLight->color[0], directionalLight->color[1],directionalLight->color[2]);
-    fflush(stdout);
-  }
-
-  for(size_t i = 0; i < omniDirectionalLights.length; i++) {
-    OmniDirectionalLight* omniDirectionalLight = dynamic_array_index(OmniDirectionalLight, &omniDirectionalLights, i);
-    snprintf(uniformName, 255, "omniDirectionalLights[%zu].position", i);
-    int location = glGetUniformLocation(mesh->material.shaderProgram->id, uniformName);
-    glUniform3f(location, omniDirectionalLight->position[0], omniDirectionalLight->position[1],omniDirectionalLight->position[2]);
-    snprintf(uniformName, 255, "omniDirectionalLights[%zu].color", i);
-    location = glGetUniformLocation(mesh->material.shaderProgram->id, uniformName);
-    glUniform3f(location, omniDirectionalLight->color[0], omniDirectionalLight->color[1],omniDirectionalLight->color[2]);
-  }
-
-  material_push_uniform_values(&mesh->material);
-  glBindVertexArray(mesh->renderData.vao);
-  glDrawElements(GL_TRIANGLES, mesh->renderData.indexCount, GL_UNSIGNED_INT, 0);
-}
-
-void render_texture(Texture texture) {
-  glUseProgram(quadMaterial.shaderProgram->id);
-  material_set_texture(&quadMaterial, create_string_from_literal("screenTexture"), texture);
-  material_push_uniform_values(&quadMaterial);
-
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  glBindVertexArray(quadVAO);
-  glDisable(GL_CULL_FACE);
-  glDrawArrays(GL_TRIANGLES, 0, 6);
-}
-
-void render_scene(Scene* scene, int windowWidth, int windowHeight) {
-  //perspective matrix
+/*
+void render_scene(Scene* scene, u16 windowWidth, u16 windowHeight) {
   glViewport(0, 0, windowWidth, windowHeight);
-  glm_perspective(glm_rad(90.0f), (float)windowWidth/(float)windowHeight, 0.1f, 100.0f, projectionMatrix);
-
-  //camera matrices
-  mat4 viewMatrix, skyboxViewMatrix;
-  vec3 center, facing, position;
-  vec3 up = {0.0f, 1.0f, 0.0f}, origin = {0.0f, 0.0f, 0.0f};
-
-  facing[0] = scene->camera.facing[0];
-  facing[1] = scene->camera.facing[1];
-  facing[2] = scene->camera.facing[2];
-  
-  position[0] = scene->camera.position[0];
-  position[1] = scene->camera.position[1];
-  position[2] = scene->camera.position[2];
-
-  glm_vec3_add(facing, position, center);
-  glm_lookat(position, center, up, viewMatrix);
-  glm_lookat(origin, facing, up,skyboxViewMatrix);
-
-  //render skybox
-  glDisable(GL_CULL_FACE);
-  glUseProgram(scene->skyBoxMaterial.shaderProgram->id);
-
-  material_set_mat4(&scene->skyBoxMaterial, create_string_from_literal("viewMatrix"), skyboxViewMatrix);
-  material_set_mat4(&scene->skyBoxMaterial, create_string_from_literal("projectionMatrix"), projectionMatrix);
-  material_push_uniform_values(&scene->skyBoxMaterial);
-
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  glBindVertexArray(cubeMapVAO);
-  glDrawArrays(GL_TRIANGLES, 0, 36);
-
-  glEnable(GL_CULL_FACE);
-  glClear(GL_DEPTH_BUFFER_BIT);
-
-  //render meshes
-  for(size_t i = 0; i < scene->meshList.length; i++) {
-    render_mesh(&scene->meshList.data[i], &scene->camera, viewMatrix, scene->directionalLights, scene->omniDirectionalLights);
-  }
+  SceneNode* root = scene->root;
+  for(root.)
 }
+*/
 
 #endif

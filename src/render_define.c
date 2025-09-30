@@ -1,0 +1,49 @@
+#ifndef RENDER_DEFINE_IMPL
+#define RENDER_DEFINE_IMPL
+
+#include <glad/glad.h>
+#include 
+
+typedef GLuint Texture;
+
+typedef enum {
+  UNIFORM_TYPE_BOOL,
+  UNIFORM_TYPE_INT,
+  UNIFORM_TYPE_UNSIGNED_INT,
+  UNIFORM_TYPE_FLOAT,
+  UNIFORM_TYPE_DOUBLE,
+  UNIFORM_TYPE_SAMPLER1D,
+  UNIFORM_TYPE_SAMPLER2D,
+  UNIFORM_TYPE_SAMPLER3D,
+  UNIFORM_TYPE_SAMPLERCUBE,
+  UNIFORM_TYPE_VEC2,
+  UNIFORM_TYPE_VEC3,
+  UNIFORM_TYPE_VEC4,
+  UNIFORM_TYPE_MAT2,
+  UNIFORM_TYPE_MAT3,
+  UNIFORM_TYPE_MAT4,
+  UNIFORM_TYPE_INVALID,
+  UNIFORM_TYPE_IVEC2,
+  UNIFORM_TYPE_IVEC3,
+  UNIFORM_TYPE_IVEC4,
+  UNIFORM_TYPE_UVEC2,
+  UNIFORM_TYPE_UVEC3,
+  UNIFORM_TYPE_UVEC4,
+  UNIFORM_TYPE_IMAGE2D,
+} UniformType;
+
+typedef struct {
+  UniformType type;
+  String name;
+  int location;
+} Uniform;
+
+DEFINE_DYNAMIC_ARRAY(Uniform)
+
+typedef struct {
+  GLuint id;
+  DynamicArray(Uniform) uniforms;
+} ShaderProgram;
+
+
+#endif

@@ -12,8 +12,8 @@
 #include <malloc.h>
 #include <string.h>
 
+/*
 #include "data_types/arena.c"
-#include "pbr.c"
 #include "data_types/array.c"
 #include "data_types/string.c"
 #include "scene_define.c"
@@ -21,17 +21,18 @@
 #include "material.c"
 #include "environment_map.c"
 #include "render.c"
-#include "gltf_loader.c"
-#include "bloom.c"
+*/
 
 GLFWwindow* window;
 static int windowWidth, windowHeight;
 
+/*
 GLuint fbo, rbo;
 Texture frameTexture, threshHoldTexture;
 GLuint gBufferFbo, gBufferRbo;
 Texture positionBuffer, normalBuffer, albedoBuffer, metallicRoughnessBuffer, emissiveBuffer;
-
+*/
+/*
 void input(GLFWwindow *window, Camera *cam, float dt) {
   float speed = 5.0;
   vec3 forward, left, back, right;
@@ -82,12 +83,14 @@ void input(GLFWwindow *window, Camera *cam, float dt) {
 
   glm_vec3_normalize(cam->facing);
 }
+*/
 
 void GLAPIENTRY message_call_back(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
   fprintf(stderr, "OpenGL Error: %s\n", message);
   fflush(stderr);
 }
 
+/*
 void window_resize_call_back(GLFWwindow* window, int width, int height) {
   glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
   glBindTexture(GL_TEXTURE_2D, frameTexture);
@@ -103,6 +106,7 @@ void window_resize_call_back(GLFWwindow* window, int width, int height) {
 void render_g_buffer(const Scene* scene) {
 
 }
+*/
 
 void init_window(uint16_t width, uint16_t height) {
 
@@ -147,10 +151,10 @@ void init_window(uint16_t width, uint16_t height) {
   glEnable(GL_DEBUG_OUTPUT);
 
   glDebugMessageCallback(message_call_back, 0);
-  glfwSetWindowSizeCallback(window, window_resize_call_back);
-  glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
+  //glfwSetWindowSizeCallback(window, window_resize_call_back);
+  //glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
 }
-
+/*
 void setup_framebuffer(void) {
   //render framebuffer setup
   glGenFramebuffers(1, &fbo);
@@ -243,6 +247,7 @@ void setup_gBuffer(void) {
   glDrawBuffers(5, gBuffers);
 }
 
+
 int main(void) {
   init_window(960, 540);
 
@@ -314,7 +319,7 @@ int main(void) {
 
   Scene scene = (Scene){meshes, directionalLights, omniLights, {0}, camera, skyBoxMaterial};
   
-  /* renders */
+  // renders
 
   double previousTime = 0;
   while (!glfwWindowShouldClose(window)) {
@@ -348,3 +353,30 @@ int main(void) {
 
   return 0;
 }
+*/
+
+#include "gltf_loader.c"
+
+int main(void) {
+  init_window(960, 540);
+
+  Arena arena = arena_create(1<<28);
+  Mesh mesh = load_gtlf(&arena, str("res/gltf/Lantern/"), str("Lantern.gltf"));
+  ShaderProgram shader
+
+  while (!glfwWindowShouldClose(window)) {
+    glClear(GL_COLOR_BUFFER_BIT);
+    glBindVertexArray(mesh.vao);
+    /*
+    printf("%u\n", mesh.indexCount);
+    fflush(stdout);
+    */
+    glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, 0);
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+  }
+  glfwTerminate();
+
+  free(arena.data);
+  return 0;
+};

@@ -21,13 +21,8 @@ typedef struct Arena Arena;
 struct Arena {
   char *data;
   size_t offset;
-  size_t capcity;
+  size_t capacity;
 };
-
-typedef struct {
-  Arena* allocator;
-  const size_t markOffset;
-} ScratchArena;
 
 uintptr_t align_forward(uintptr_t ptr, uint8_t alignment) {
   uintptr_t offset = ptr % alignment;
@@ -41,7 +36,7 @@ void* arena_alloc_align(Arena* arena, size_t n, uint8_t alignment) {
   uintptr_t ptr = (uintptr_t)arena->data + arena->offset;
   uintptr_t aligned_ptr = align_forward(ptr, alignment);
 
-  ARENA_ASSERT(aligned_ptr < (uintptr_t)arena->data + arena->capcity);
+  ARENA_ASSERT(aligned_ptr < (uintptr_t)arena->data + arena->capacity);
 
   arena->offset = aligned_ptr - (uintptr_t)arena->data + n;
   char* result = (char *)aligned_ptr;
@@ -54,15 +49,9 @@ void* arena_alloc(Arena* arena, size_t n) {
   return arena_alloc_align(arena, n, alignment);
 }
 
-void arena_clear(Arena *arena) { arena->offset = 0; }
-Arena create_arena(char*data, size_t capcity) { return (Arena){.data=data, .offset=0, .capcity=capcity}; }
-
-ScratchArena create_scratch_arena(Arena* arena) { return (ScratchArena){.allocator=arena, .markOffset=arena->offset}; }
-void release_scratch_arena(ScratchArena mark) { mark.allocator->offset = mark.markOffset; }
-
-void free_arena(Arena* arena) { free(arena->data); }
-
+#define arena_create(capacity) (Arena){malloc(capacity), 0, capacity}
+#define areana_clear(arena) arena->offset = 0;
 #define arena_alloc_array(arena, type, n) arena_alloc(arena, sizeof(type) * n)
 #define arena_alloc_struct(arena, type) arena_alloc(arena, sizeof(type))
-
 #endif
+
